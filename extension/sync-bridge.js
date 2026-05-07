@@ -27,6 +27,11 @@
     }
 
     function writeToLocalStorage(data) {
+        // If the extension reloaded between the chrome.storage.local.get
+        // call and this callback, ANY further chrome.* touch throws. We're
+        // only doing localStorage here, but the surrounding closure may
+        // still hold a stale callback ref — bail early if invalidated.
+        if (invalidated || !isContextValid()) { markInvalidated('writeToLocalStorage'); return; }
         try {
             const json = JSON.stringify(data);
             const prev = window.localStorage.getItem(STORAGE_KEY);
@@ -53,6 +58,7 @@
     // Receive push from background worker (instant) — wrapped for safety
     try {
         chrome.runtime.onMessage.addListener((msg) => {
+            if (invalidated || !isContextValid()) return;
             try {
                 if (msg && msg.type === 'GOMINING_SYNC_PUSH' && msg.data) {
                     writeToLocalStorage(msg.data);
