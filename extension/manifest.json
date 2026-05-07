@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GoMining Simulator",
-  "version": "1.6",
+  "version": "1.7",
   "description": "Auto-sync your GoMining data with the GoMining Simulator",
   "icons": {
     "16": "icon-16.png",
@@ -11,6 +11,11 @@
   "permissions": ["storage"],
   "host_permissions": ["https://app.gomining.com/*", "https://api.gomining.com/*"],
   "content_scripts": [
+    {
+      "matches": ["https://app.gomining.com/*"],
+      "js": ["inject-early.js"],
+      "run_at": "document_start"
+    },
     {
       "matches": ["https://app.gomining.com/*"],
       "js": ["extractor.js"],
