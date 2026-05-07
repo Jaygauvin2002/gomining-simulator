@@ -125,8 +125,26 @@ async function recordLogin(user) {
 
 // ----- sidebar widget (only renders if #auth-widget exists) -----
 function renderAuthUI(user) {
-  // Top-nav admin pill — show for admins, hide otherwise. Lives outside
-  // the main auth-widget so it can be visible without opening the kebab.
+  // Compact email-only display in the top-nav (the full panel with
+  // avatar/name/tier/admin lives inside the kebab menu's #auth-widget).
+  const emailCompact = document.getElementById("auth-email-compact");
+  if (emailCompact) {
+    if (user?.email) {
+      const localPart = user.email.split("@")[0];
+      const display = user.email.length > 28 ? localPart : user.email;
+      emailCompact.textContent = display;
+      emailCompact.title = user.email;
+      emailCompact.setAttribute("aria-hidden", "false");
+      emailCompact.style.display = "";
+    } else {
+      emailCompact.textContent = "";
+      emailCompact.setAttribute("aria-hidden", "true");
+      emailCompact.style.display = "none";
+    }
+  }
+
+  // Optional top-nav admin pill — kept for backward compat if the markup
+  // is present elsewhere; harmless when removed.
   const topAdminBtn = document.getElementById("top-nav-admin-btn");
   if (topAdminBtn) {
     topAdminBtn.style.display = isAdmin(user) ? "inline-flex" : "none";

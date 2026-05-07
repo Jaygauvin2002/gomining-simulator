@@ -1238,6 +1238,44 @@ body.has-live-footer .main-content { padding-bottom: 64px; }
     outline-offset: 2px;
 }
 
+/* Compact email display in the top-nav (full auth panel lives in kebab) */
+.top-nav-email {
+    color: var(--text-dim);
+    font-size: 0.82em;
+    font-weight: 500;
+    max-width: 240px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--border-soft);
+    display: none;
+}
+@media (max-width: 880px) {
+    .top-nav-email { max-width: 140px; font-size: 0.76em; }
+}
+@media (max-width: 640px) {
+    .top-nav-email { display: none !important; }
+}
+
+/* Sync status row inside the kebab menu (replaces the old top-nav pill) */
+.tnm-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-soft);
+    font-size: 0.84em;
+    color: var(--text-dim);
+    cursor: help;
+    margin: 0 4px;
+}
+.tnm-status-row .sync-dot { flex-shrink: 0; }
+
 /* Mode toggle — Solo Mining vs Miner Wars (lives in top-nav of both pages) */
 .mode-toggle {
     display: inline-flex;

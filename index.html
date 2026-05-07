@@ -471,26 +471,25 @@
 
         <!-- Right cluster: status pill + Connect Extension + ⋯ menu + auth -->
         <div class="top-nav-right">
-            <!-- Connection Pulse (sync status pill, like the mockup) -->
-            <div class="sync-status" id="sync-status">
-                <div class="sync-dot" id="sync-dot"></div>
-                <span id="sync-label" data-i18n="connection_pulse">Connection Pulse</span>
-            </div>
+            <!-- Compact email-only display (full auth widget lives in the kebab menu below) -->
+            <span id="auth-email-compact" class="top-nav-email" aria-hidden="true"></span>
 
-            <!-- Admin Dashboard (only visible to admins — toggled by auth.js) -->
-            <a id="top-nav-admin-btn" class="top-nav-admin-cta" href="admin.html" target="_blank" rel="noopener" style="display:none;">
-                <span aria-hidden="true">🛠</span>
-                <span>Admin</span>
-            </a>
-
-            <!-- Connect Extension button (like the mockup) -->
-            <button class="top-nav-cta" onclick="showExtensionGuide()" data-i18n="connect_extension">Connect Extension</button>
-
-            <!-- Overflow menu: Refresh / Theme / Lang / Export / Import / Guide / Support -->
+            <!-- Overflow menu: sync status / connect extension / refresh / lang / export / import / guide / support -->
             <div class="top-nav-menu-wrap">
                 <button class="top-nav-menu-btn" onclick="document.getElementById('top-nav-menu').classList.toggle('open')" aria-label="More options" title="More">⋯</button>
                 <div class="top-nav-menu" id="top-nav-menu">
+                    <!-- Sync status (was a pill in the top-nav, now lives here) -->
                     <div class="tnm-section">
+                        <div class="tnm-status-row sync-status" id="sync-status" title="">
+                            <div class="sync-dot" id="sync-dot"></div>
+                            <span id="sync-label" data-i18n="connection_pulse">Connection Pulse</span>
+                        </div>
+                    </div>
+                    <!-- Connect Extension + Refresh -->
+                    <div class="tnm-section">
+                        <button class="tnm-item" onclick="showExtensionGuide();document.getElementById('top-nav-menu').classList.remove('open');">
+                            <span class="tnm-ico">🔌</span> <span data-i18n="connect_extension">Connect Extension</span>
+                        </button>
                         <button class="tnm-item" onclick="fetchLiveData();document.getElementById('top-nav-menu').classList.remove('open');">
                             <span class="tnm-ico">↻</span> <span data-i18n="refresh">Refresh data</span>
                         </button>
@@ -515,9 +514,6 @@
                         <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importAllData(event);document.getElementById('top-nav-menu').classList.remove('open');">
                     </div>
                     <div class="tnm-section">
-                        <button class="tnm-item" onclick="showExtensionGuide();document.getElementById('top-nav-menu').classList.remove('open');">
-                            <span class="tnm-ico">📦</span> <span data-i18n="sidebar_guide">Extension Guide</span>
-                        </button>
                         <a class="tnm-item tnm-item--support" href="support.html">
                             <span class="tnm-ico">❤</span> <span>Support us</span>
                         </a>
