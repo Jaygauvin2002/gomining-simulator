@@ -31,7 +31,7 @@
             } catch(e) {
                 console.warn('[GoMining Extractor] Auto-sync error:', e);
             }
-        }, AUTOSYNC_DEBOUNCE_MS);
+        }, delay);
     }
 
     const DATA = {
