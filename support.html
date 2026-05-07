@@ -3,9 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Support Us · GoMining Simulator</title>
-  <meta name="description" content="GoMining Simulator is free and ad-free. If it saved you time, consider supporting development with a small Bitcoin tip.">
+  <title>Support Us · GMSim</title>
+  <meta name="description" content="GMSim is free and ad-free. If it saved you time, consider supporting development with a small Bitcoin tip.">
+  <meta property="og:title" content="Support · GMSim">
+  <meta property="og:description" content="GMSim is free and ad-free. Support development with a Bitcoin tip if it saved you time.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="icon.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Support · GMSim">
+  <meta name="twitter:description" content="Help keep GMSim free and ad-free.">
   <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
   <style>
     :root {
       --bg:#0a0e14; --card:#161b22; --border:rgba(255,255,255,.08);
@@ -13,9 +21,10 @@
       --green:#3fb950; --pink:#ff6b9d;
     }
     *{box-sizing:border-box;margin:0;padding:0}
+    html{background:var(--bg)}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-         background:var(--bg);color:var(--text);line-height:1.7;font-size:15px;
-         min-height:100vh;display:flex;flex-direction:column}
+         color:var(--text);line-height:1.7;font-size:15px;
+         min-height:100vh;display:flex;flex-direction:column;position:relative}
     .wrap{max-width:560px;margin:0 auto;padding:48px 24px 60px;width:100%;flex:1}
     .back{color:var(--text-dim);text-decoration:none;font-size:.85em;display:inline-block;margin-bottom:20px}
     .back:hover{color:var(--accent)}
@@ -60,14 +69,33 @@
     footer a{margin:0 10px;color:var(--text-dim);text-decoration:none}
     footer a:hover{color:var(--accent)}
   </style>
+  <link rel="stylesheet" href="css/tokens.css?v=20260506a">
 </head>
 <body>
+  <div class="app-bg-logo app-bg-logo--btc" aria-hidden="true">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="50" fill="#f7931a"/>
+      <text x="50" y="50" dy="0.35em" text-anchor="middle" fill="#fff"
+            font-family="Arial Black,sans-serif" font-weight="900" font-size="68" letter-spacing="-0.04em">₿</text>
+    </svg>
+  </div>
+  <div class="app-bg-logo app-bg-logo--gmt" aria-hidden="true">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="gmtBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#b889ff"/><stop offset="100%" stop-color="#7c4dff"/>
+      </linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#gmtBgGrad)"/>
+      <text x="50" y="50" dy="0.35em" text-anchor="middle" fill="#fff"
+            font-family="Arial Black,sans-serif" font-weight="900" font-size="60" letter-spacing="-0.04em">G</text>
+    </svg>
+  </div>
+
   <div class="wrap">
     <a href="index.html" class="back">← Back to app</a>
     <header>
       <img src="icon.png" alt="" class="logo">
       <h1>Support us <span class="heart">❤</span></h1>
-      <p class="tagline">GoMining Simulator is <strong style="color:var(--text)">free and ad-free</strong>. If the tool saved you time or made you money, a small tip helps us keep building.</p>
+      <p class="tagline">GMSim is <strong style="color:var(--text)">free and ad-free</strong>. If the tool saved you time or made you money, a small tip helps us keep building.</p>
     </header>
 
     <div class="card">
@@ -85,7 +113,7 @@
     </div>
 
     <div class="thanks">
-      <strong>Thank you</strong> for using GoMining Simulator.<br>
+      <strong>Thank you</strong> for using GMSim.<br>
       May your hashrate stay green.
     </div>
   </div>

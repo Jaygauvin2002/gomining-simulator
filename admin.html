@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex,nofollow">
-  <title>Admin · GoMining Simulator</title>
+  <title>Admin · GMSim</title>
   <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
   <style>
     :root {
       --bg:#0a0e14; --bg2:#0d1117; --card:#161b22;
@@ -13,8 +14,9 @@
       --accent:#f7931a; --green:#3fb950; --red:#f85149; --blue:#58a6ff;
     }
     *{box-sizing:border-box;margin:0;padding:0}
+    html{background:var(--bg)}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-         background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+         color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;position:relative}
     .wrap{max-width:1200px;margin:0 auto;padding:32px 24px}
     header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;
            padding-bottom:20px;border-bottom:1px solid var(--border)}
@@ -72,11 +74,30 @@
     input.search{background:#0d1117;border:1px solid var(--border);color:var(--text);
                  padding:7px 11px;border-radius:8px;font-size:.85em;width:220px}
   </style>
+  <link rel="stylesheet" href="css/tokens.css?v=20260506a">
 </head>
 <body>
+  <div class="app-bg-logo app-bg-logo--btc" aria-hidden="true">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="50" fill="#f7931a"/>
+      <text x="50" y="50" dy="0.35em" text-anchor="middle" fill="#fff"
+            font-family="Arial Black,sans-serif" font-weight="900" font-size="68" letter-spacing="-0.04em">₿</text>
+    </svg>
+  </div>
+  <div class="app-bg-logo app-bg-logo--gmt" aria-hidden="true">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="gmtBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#b889ff"/><stop offset="100%" stop-color="#7c4dff"/>
+      </linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#gmtBgGrad)"/>
+      <text x="50" y="50" dy="0.35em" text-anchor="middle" fill="#fff"
+            font-family="Arial Black,sans-serif" font-weight="900" font-size="60" letter-spacing="-0.04em">G</text>
+    </svg>
+  </div>
+
   <div class="wrap">
     <header>
-      <h1>GoMining <span class="accent">Admin</span></h1>
+      <h1>GMSim <span class="accent">Admin</span></h1>
       <div id="who" class="who"></div>
     </header>
 
@@ -97,17 +118,6 @@
 
     <div id="dash" style="display:none">
       <div class="stats" id="stats"></div>
-
-      <div class="panel">
-        <h2><span>Quick links</span></h2>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
-          <a href="index.html" target="_blank" class="ghost" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 12px;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:.82em">🏠 Main app</a>
-          <a href="mining-wars.html" target="_blank" class="ghost" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 12px;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:.82em">⚔️ Mining Wars</a>
-          <a href="reinvestment.html" target="_blank" class="ghost" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 12px;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:.82em">🧪 Reinvestment Lab</a>
-          <a href="support.html" target="_blank" class="ghost" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 12px;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:.82em">❤ Support page</a>
-          <a href="about.html" target="_blank" class="ghost" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 12px;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:.82em">ℹ About</a>
-        </div>
-      </div>
 
       <div class="panel">
         <h2>
@@ -144,7 +154,7 @@
 <script type="module">
   import { auth, db, signInWithGoogle, signOutUser, isAdmin, onUserReady }
     from "./auth.js";
-  import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, serverTimestamp }
+  import { collection, getDocs, query, orderBy, limit, doc, updateDoc, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const $ = sel => document.querySelector(sel);
@@ -173,17 +183,11 @@
   }
 
   let allUsers = [];
-  let publicCount = null;        // from meta/userCount (includes pre-tracked + new)
 
   async function loadUsers() {
     const q = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(500));
     const snap = await getDocs(q);
     allUsers = snap.docs.map(d => d.data());
-    // also pull the public landing-page counter
-    try {
-      const metaSnap = await getDoc(doc(db, "meta", "userCount"));
-      publicCount = metaSnap.exists() ? (metaSnap.data().count || 0) : null;
-    } catch { publicCount = null; }
     renderStats();
     renderTable($("#search").value);
   }
@@ -223,17 +227,10 @@
     }
     const avgSession = totalSessionCount ? totalSessionMs / totalSessionCount : 0;
     const retentionPct = total ? Math.round((returners / total) * 100) : 0;
-    const counterDelta = publicCount !== null ? publicCount - total : null;
     $("#stats").innerHTML = `
       <div class="stat"><div class="label">Total users</div>
         <div class="value">${total.toLocaleString()}</div>
         <div class="sub">+${today} today, +${week} this week</div></div>
-      <div class="stat"><div class="label">Public counter</div>
-        <div class="value" style="color:var(--blue)">${publicCount !== null ? publicCount.toLocaleString() : "—"}</div>
-        <div class="sub">${publicCount === null ? "meta/userCount not seeded" :
-          (counterDelta === 0 ? "matches user list" :
-           counterDelta > 0 ? `+${counterDelta} from manual seed` :
-           `${counterDelta} drift — re-seed?`)}</div></div>
       <div class="stat"><div class="label">Premium</div>
         <div class="value" style="color:var(--accent)">${premiumCount}</div>
         <div class="sub">${total ? Math.round(premiumCount/total*100) : 0}% of base</div></div>

@@ -1,0 +1,204 @@
+/* =============================================================
+   tokens.css — GMSim redesign design system
+   Loaded AFTER main.css so these tokens cascade on top.
+   Overrides selected variables and adds new ones for the refreshed
+   look (subtle dot-grid bg, elevation system, refined shadows,
+   typography scale). Layout-affecting tokens (--sidebar-w,
+   --tab-bar-h, base radii) are intentionally kept untouched.
+   ============================================================= */
+
+:root {
+    /* ---------- Surfaces & elevation ---------------------------- */
+    --bg-deep:        #07090d;
+    --bg-soft:        #0c1117;
+    --surface-1:      #11161e;
+    --surface-2:      #161c25;
+    --surface-3:      #1c2330;
+    --surface-glass:  rgba(22, 28, 38, 0.72);
+
+    /* ---------- Accent system (kept compatible with --accent) ---- */
+    --accent-50:      #fff5e6;
+    --accent-200:     #ffd699;
+    --accent-400:     #ffaf3d;
+    --accent-500:     #f7931a;     /* matches existing --accent */
+    --accent-600:     #d97a06;
+    --accent-700:     #a85a00;
+    --accent-glow:    rgba(247, 147, 26, 0.22);
+    --accent-soft:    rgba(247, 147, 26, 0.08);
+    --accent-line:    rgba(247, 147, 26, 0.32);
+
+    /* ---------- Semantic tokens (subtle refinements) ------------- */
+    --success-soft:   rgba(63, 185, 80, 0.10);
+    --success-line:   rgba(63, 185, 80, 0.28);
+    --danger-soft:    rgba(248, 81, 73, 0.10);
+    --danger-line:    rgba(248, 81, 73, 0.28);
+    --info-soft:      rgba(88, 166, 255, 0.10);
+    --info-line:      rgba(88, 166, 255, 0.28);
+    --gmt-soft:       rgba(188, 140, 255, 0.10);
+    --gmt-line:       rgba(188, 140, 255, 0.28);
+
+    /* ---------- Border refinement -------------------------------- */
+    --border-soft:    rgba(255, 255, 255, 0.04);
+    --border-strong:  rgba(255, 255, 255, 0.14);
+
+    /* ---------- Shadow system ------------------------------------ */
+    --shadow-xs:      0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-sm:      0 2px 6px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.18);
+    --shadow-md:      0 6px 16px rgba(0, 0, 0, 0.38), 0 2px 4px rgba(0, 0, 0, 0.20);
+    --shadow-lg:      0 16px 40px rgba(0, 0, 0, 0.45), 0 4px 8px rgba(0, 0, 0, 0.22);
+    --shadow-glow:    0 0 32px var(--accent-glow);
+
+    /* Top-edge inner light gives surfaces a subtle gloss */
+    --inset-top:      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    --inset-top-strong: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+
+    /* ---------- Background pattern (dot grid) ------------------- */
+    --bg-dot-color:   rgba(255, 255, 255, 0.035);
+    --bg-dot-size:    28px;
+    --bg-dot-radius:  1.1px;
+
+    /* ---------- Typography scale -------------------------------- */
+    --fs-display:     clamp(2rem, 4vw, 2.8rem);
+    --fs-h1:          1.65rem;
+    --fs-h2:          1.2rem;
+    --fs-h3:          1rem;
+    --fs-body:        0.9375rem;     /* 15px — matches body */
+    --fs-sm:          0.8125rem;     /* 13px */
+    --fs-xs:          0.6875rem;     /* 11px */
+    --fs-2xs:         0.625rem;      /* 10px */
+
+    /* Letter-spacing presets */
+    --ls-display:     -0.035em;
+    --ls-tight:       -0.02em;
+    --ls-snug:        -0.01em;
+    --ls-wide:        0.08em;
+    --ls-2xwide:      0.14em;
+
+    /* Line-heights */
+    --lh-display:     1.05;
+    --lh-heading:     1.2;
+    --lh-body:        1.6;
+
+    /* ---------- Spacing scale (additive — not used to override) -- */
+    --gap-2xs:        4px;
+    --gap-xs:         8px;
+    --gap-sm:         12px;
+    --gap-md:         20px;
+    --gap-lg:         28px;
+    --gap-xl:         40px;
+
+    /* ---------- Motion system ----------------------------------- */
+    --t-fast:         0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    --t:              0.2s  cubic-bezier(0.4, 0, 0.2, 1);
+    --t-slow:         0.4s  cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ---------- New radii (additive) ---------------------------- */
+    --r-pill:         999px;
+    --r-xs:           4px;
+    --r-card:         14px;
+    --r-card-lg:      20px;
+}
+
+/* =============================================================
+   Subtle dot-grid background applied to the whole app.
+   Layered on top of --bg so existing rules still set the base color.
+   Uses background-attachment: fixed so it doesn't scroll past the
+   viewport — a single coherent texture across all tabs.
+   ============================================================= */
+body {
+    background-image:
+        radial-gradient(circle, var(--bg-dot-color) var(--bg-dot-radius), transparent var(--bg-dot-radius));
+    background-size: var(--bg-dot-size) var(--bg-dot-size);
+    background-attachment: fixed;
+    background-position: 0 0;
+    position: relative;
+}
+
+/* =============================================================
+   Animated background brand logos — BTC + GMT drifting behind UI.
+   Visible enough to read as logos, dim enough not to compete with
+   content. Fixed to viewport, pointer-events disabled, z-index < 0.
+   ============================================================= */
+.app-bg-logo {
+    position: fixed;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.16;
+    filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45));
+    will-change: transform;
+}
+.app-bg-logo svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+.app-bg-logo--btc {
+    width: 460px;
+    height: 460px;
+    top: -120px;
+    left: -120px;
+    animation: bg-logo-drift-a 38s ease-in-out infinite;
+}
+.app-bg-logo--gmt {
+    width: 520px;
+    height: 520px;
+    bottom: -140px;
+    right: -160px;
+    animation: bg-logo-drift-b 44s ease-in-out infinite;
+}
+@keyframes bg-logo-drift-a {
+    0%, 100% { transform: translate(0, 0)        rotate(0deg)   scale(1);    }
+    33%      { transform: translate(80px, 60px)  rotate(8deg)   scale(1.08); }
+    66%      { transform: translate(40px, 120px) rotate(-6deg)  scale(0.94); }
+}
+@keyframes bg-logo-drift-b {
+    0%, 100% { transform: translate(0, 0)         rotate(0deg)  scale(1);    }
+    40%      { transform: translate(-100px, -70px) rotate(-10deg) scale(1.06); }
+    75%      { transform: translate(-50px, -140px) rotate(6deg)  scale(0.96); }
+}
+
+/* Honour reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+    .app-bg-logo {
+        animation: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .app-bg-logo--btc { width: 280px; height: 280px; }
+    .app-bg-logo--gmt { width: 320px; height: 320px; }
+}
+
+/* =============================================================
+   Focus ring — consistent across the app, accessible.
+   ============================================================= */
+:where(button, input, select, textarea, [tabindex], a):focus-visible {
+    outline: 2px solid var(--accent-400);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* =============================================================
+   Custom scrollbars — subtle, match the dark theme.
+   ============================================================= */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.06);
+    border-radius: var(--r-pill);
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); background-clip: content-box; }
+
+/* =============================================================
+   Selection — uses the accent so highlights feel branded.
+   ============================================================= */
+::selection {
+    background: var(--accent-glow);
+    color: var(--text);
+}

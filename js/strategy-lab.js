@@ -44,14 +44,20 @@ function initStrategyLab() {
             const dailySel = document.getElementById('strategy-period-selector');
             const monthlySel = document.getElementById('strategy-monthly-selector');
             const label = document.getElementById('strategy-period-label');
+            const stepTitle = document.getElementById('strategy-step2-title');
+            const stepSub   = document.getElementById('strategy-step2-sub');
             if (strategyMode === 'monthly') {
                 dailySel.style.display = 'none';
                 monthlySel.style.display = 'flex';
                 if (label) label.textContent = t('strategy_monthly_label') || 'Editable months — fewer than 6 = pattern repeats to fill the projection';
+                if (stepTitle) stepTitle.textContent = t('strategy_step2_title_weekly') || 'Tune week-by-week';
+                if (stepSub)   stepSub.textContent   = t('strategy_step2_sub_weekly')   || 'Click any cell to cycle through BTC / GMT / TH for that week.';
             } else {
                 dailySel.style.display = 'flex';
                 monthlySel.style.display = 'none';
                 if (label) label.textContent = t('strategy_period') || 'Period';
+                if (stepTitle) stepTitle.textContent = t('strategy_step2_title') || 'Tune day-by-day';
+                if (stepSub)   stepSub.textContent   = t('strategy_step2_sub')   || 'Click any cell to cycle through BTC / GMT / TH for that day.';
             }
             rebuildStrategyGrid();
         });
@@ -261,9 +267,20 @@ function smartFillStrategy(target, source = 'gmt') {
     const Y = N - X;
     const targetLabel = target.toUpperCase();
     const sourceLabel = source.toUpperCase();
-    const tmpl = t('strategy_smart_result_v2') || 'Mine {source} for {x} days to cover fees, then switch to {target} for the remaining {y} days.';
-    outEl.innerHTML = '✓ ' + tmpl.replace('{source}', sourceLabel).replace('{x}', X).replace('{y}', Y).replace('{target}', targetLabel);
-    outEl.style.color = 'var(--green)';
+    outEl.innerHTML = `
+        <span class="strat-smart-check">✓</span>
+        <span class="strat-smart-step">
+            <strong>${X}</strong> ${X === 1 ? 'day' : 'days'} mining
+            <span class="strat-smart-pill strat-smart-pill--${source}">${sourceLabel}</span>
+            to cover fees
+        </span>
+        <span class="strat-smart-arrow">→</span>
+        <span class="strat-smart-step">
+            then <strong>${Y}</strong> ${Y === 1 ? 'day' : 'days'} on
+            <span class="strat-smart-pill strat-smart-pill--${target}">${targetLabel}</span>
+        </span>
+    `;
+    outEl.style.color = '';
 }
 
 function updateStrategyPriceHints() {

@@ -125,6 +125,13 @@ async function recordLogin(user) {
 
 // ----- sidebar widget (only renders if #auth-widget exists) -----
 function renderAuthUI(user) {
+  // Top-nav admin pill — show for admins, hide otherwise. Lives outside
+  // the main auth-widget so it can be visible without opening the kebab.
+  const topAdminBtn = document.getElementById("top-nav-admin-btn");
+  if (topAdminBtn) {
+    topAdminBtn.style.display = isAdmin(user) ? "inline-flex" : "none";
+  }
+
   const el = document.getElementById("auth-widget");
   if (!el) return;
   if (user) {

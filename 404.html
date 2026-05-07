@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 · Page not found · GMSim</title>
+  <meta name="description" content="The page you're looking for doesn't exist on GMSim.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <style>
+    :root {
+      --bg:#0a0e14; --text:#e6edf3; --text-dim:#8b949e;
+      --accent:#f7931a; --purple:#bc8cff; --green:#3fb950;
+      --border:rgba(255,255,255,.08);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{background:var(--bg)}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;
+      padding:24px;line-height:1.6;position:relative;overflow:hidden;
+    }
+    .glow {
+      position:fixed;top:50%;left:50%;width:600px;height:600px;border-radius:50%;
+      background:radial-gradient(circle, rgba(247,147,26,0.12) 0%, transparent 60%);
+      filter:blur(60px);transform:translate(-50%,-50%);pointer-events:none;z-index:-1;
+    }
+    .card{
+      max-width:480px;width:100%;text-align:center;
+      background:linear-gradient(180deg,#0e131b 0%, rgba(13,17,23,0.6) 100%);
+      border:1px solid rgba(247,147,26,0.18);border-radius:18px;
+      padding:36px 32px;
+      box-shadow:0 24px 60px -20px rgba(247,147,26,0.18);
+      position:relative;overflow:hidden;
+    }
+    .card::before{
+      content:"";position:absolute;inset:0 0 auto 0;height:1px;
+      background:linear-gradient(90deg,transparent,rgba(247,147,26,0.5),transparent);
+    }
+    .eyebrow{
+      display:inline-block;font-size:.7em;font-weight:700;text-transform:uppercase;
+      letter-spacing:.18em;color:var(--accent);
+      background:rgba(247,147,26,0.08);border:1px solid rgba(247,147,26,0.22);
+      padding:4px 10px;border-radius:999px;margin-bottom:16px;
+    }
+    .big{
+      font-size:5em;font-weight:900;letter-spacing:-.04em;line-height:1;margin:8px 0 14px;
+      background:linear-gradient(135deg,#ffd27a 0%,var(--accent) 60%,#b85e00 100%);
+      -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+    }
+    h1{font-size:1.4em;font-weight:800;letter-spacing:-.02em;margin-bottom:8px}
+    p{color:var(--text-dim);font-size:.92em;margin-bottom:24px}
+    .actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+    .btn{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:11px 18px;border-radius:10px;font-weight:700;font-size:.88em;
+      text-decoration:none;transition:transform .12s,filter .12s,box-shadow .12s;
+    }
+    .btn-primary{
+      background:linear-gradient(135deg,#ffaa3d,var(--accent));color:#1a1100;
+      box-shadow:0 6px 14px rgba(247,147,26,.22);
+    }
+    .btn-primary:hover{transform:translateY(-1px);filter:brightness(1.05);
+      box-shadow:0 12px 24px rgba(247,147,26,.32)}
+    .btn-secondary{
+      background:rgba(255,255,255,.04);color:var(--text);
+      border:1px solid var(--border);
+    }
+    .btn-secondary:hover{border-color:var(--text-dim);background:rgba(255,255,255,.06)}
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="card">
+    <span class="eyebrow">Lost in the mempool</span>
+    <div class="big">404</div>
+    <h1>Block not found</h1>
+    <p>The page you're after doesn't exist — maybe it was demoted, never minted, or just a typo. Let's get you back to the dashboard.</p>
+    <div class="actions">
+      <a href="/" class="btn btn-primary">↻ Back to Dashboard</a>
+    </div>
+  </div>
+</body>
+</html>
