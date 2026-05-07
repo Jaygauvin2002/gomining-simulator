@@ -201,18 +201,32 @@ function showLiveBanner(d) {
   const w  = d.wars || {};
   const lv = w.live || {};
   const _v = (x) => (x && typeof x === 'object' && 'value' in x) ? x.value : x;
-  const hasHar  = !!(_v(lv.league?.btcRewardFund) || _v(lv.league?.totalPowerTh) || _v(lv.user?.baseTh));
+  const hasHar  = !!(_v(lv.league?.btcRewardFund) || _v(lv.league?.totalPowerTh) ||
+                    _v(lv.user?.baseTh) || _v(lv.clan?.totalBaseTh) || _v(lv.round?.myClanRound));
   const hasWars = hasHar || !!(w.clan?.totalTh || w.recentBlocks?.length);
   const proj = projectFromHistory();
+  // "synced" = when this page actually loaded the snapshot (now), not when
+  // the extension extracted it. The "8d ago" banner was misleading users.
+  const syncedTs = Date.now();
+  // Diagnostic: which live MW fields actually landed?
+  const diag = [];
+  if (_v(lv.user?.baseTh))           diag.push(`TH=${(+_v(lv.user.baseTh)).toFixed(2)}`);
+  if (_v(lv.clan?.totalBaseTh))      diag.push(`clan=${(+_v(lv.clan.totalBaseTh)).toFixed(0)}TH`);
+  if (_v(lv.league?.totalPowerTh))   diag.push(`league=${(+_v(lv.league.totalPowerTh)).toFixed(0)}TH`);
+  if (_v(lv.league?.btcRewardFund))  diag.push(`fund=${(+_v(lv.league.btcRewardFund)).toFixed(5)}`);
+  if (_v(lv.round?.myClanRound))     diag.push("round✓");
+  if (_v(lv.boosts?.botBalanceGmt))  diag.push(`bot=${(+_v(lv.boosts.botBalanceGmt)).toFixed(1)}GMT`);
+
   el.style.display = "block";
   el.innerHTML = `
     <div class="live-dot"></div>
     <div class="live-text">
       <strong>Live data connected</strong>
-      <span> · ${hasWars ? "Mining Wars + solo" : "Solo mining only"} · synced ${fmtAgo(d.timestamp || Date.now())}</span>
+      <span> · ${hasWars ? "Mining Wars + solo" : "Solo mining only"} · synced ${fmtAgo(syncedTs)}${d.timestamp ? ` · captured ${fmtAgo(d.timestamp)}` : ""}</span>
+      ${diag.length ? `<span class="live-proj">MW: ${diag.join(" · ")}</span>` : ""}
       ${proj.confidence !== "no-data"
         ? `<span class="live-proj">Projection: <strong>${proj.expectedWeeklyBtc.toFixed(6)} BTC/wk</strong> from last 7 d (${proj.confidence})</span>`
-        : `<span class="live-proj">Browse Mining Wars in app.gomining.com to start collecting block history.</span>`}
+        : (!hasWars ? `<span class="live-proj">Browse Mining Wars in app.gomining.com to start collecting block history.</span>` : "")}
     </div>`;
 }
 function fmtAgo(ts) {
