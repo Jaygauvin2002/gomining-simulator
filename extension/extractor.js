@@ -14,6 +14,8 @@
     let _firstSyncDone = false;
     function scheduleAutoSync() {
         if (_autoSyncTimer) return; // already scheduled
+        // BUGFIX: previously this always used DEBOUNCE_MS (30s) so the first
+        // sync was 10× slower than intended. Use the computed delay.
         const delay = _firstSyncDone ? AUTOSYNC_DEBOUNCE_MS : AUTOSYNC_FIRST_MS;
         _autoSyncTimer = setTimeout(() => {
             _autoSyncTimer = null;
@@ -36,14 +38,14 @@
                 if (essentials.miner.power || essentials.income.prPerThGmt || essentials.rewardHistory?.length || hasWarsData) {
                     chrome.storage.local.set({ gominingAutoSync: essentials }, () => {
                         if (!chrome.runtime.lastError) {
-                            log('Auto-sync: données sauvegardées pour le simulateur');
+                            log('Auto-sync: données sauvegardées pour le simulateur (hasWars=' + !!hasWarsData + ')');
                         }
                     });
                 }
             } catch(e) {
                 console.warn('[GoMining Extractor] Auto-sync error:', e);
             }
-        }, AUTOSYNC_DEBOUNCE_MS);
+        }, delay);
     }
 
     const DATA = {
