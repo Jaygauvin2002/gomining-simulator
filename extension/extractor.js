@@ -138,12 +138,21 @@
     function purgeOldData() {
         const cutoff = new Date(Date.now() - MAX_AGE_HOURS * 3600 * 1000).toISOString();
 
+        // Drop any MW-namespace URLs that previously leaked into miner/reward
+        // pools (before the strict allowlist was added). Identifies them by
+        // URL substring — not by content — so we don't trip on field names.
+        const isMwLeaked = (entry) => /\/nft-game\/|\/clan-leaderboard\/|\/clan\/get-by(-id|-user)|\/round\/(get-state|get-last|find-by-cycleId)|\/rewards-by-user|\/get-total-reward-by-user|\/league\/(index|get-user-positions-data)|\/nft-game-bot|\/nft-game-token|\/nft-game-ability|\/nft-game-income|\/nft-game-user-profile|\/clan-rating|\/clan-message|\/league\/find-many|\/nft-game-round/i.test(entry.url || '');
+
+        let leaked = 0;
         for (const key of Object.keys(DATA.miners)) {
+            if (isMwLeaked(DATA.miners[key])) { delete DATA.miners[key]; leaked++; continue; }
             if (DATA.miners[key].time < cutoff) delete DATA.miners[key];
         }
         for (const key of Object.keys(DATA.rewards)) {
+            if (isMwLeaked(DATA.rewards[key])) { delete DATA.rewards[key]; leaked++; continue; }
             if (DATA.rewards[key].time < cutoff) delete DATA.rewards[key];
         }
+        if (leaked) log('Purge MW-leaked from solo pools: ' + leaked);
 
         // Purger apiCalls vieux
         DATA.apiCalls = DATA.apiCalls.filter(c => c.time > cutoff);
@@ -153,6 +162,8 @@
 
     // Purge auto toutes les 30 min
     setInterval(purgeOldData, 30 * 60 * 1000);
+    // Run once at startup to flush MW-leaked entries from any prior session.
+    setTimeout(purgeOldData, 500);
 
     // === Analyser les réponses API ===
     function analyzeResponse(url, data) {
@@ -194,15 +205,34 @@
             log('Données rewards: ' + key);
         }
 
-        // Données de mineur/NFT — garder seulement la dernière par endpoint
-        if (str.includes('miner') || str.includes('nft') || str.includes('th/s') || str.includes('power')) {
+        // Données de mineur/NFT — STRICT allowlist for SOLO mining endpoints.
+        // PRIOR BUG: matching on `str.includes('power')` slurped Miner Wars
+        // endpoints (clan-leaderboard returns totalPower:63042, clan/get-by-id
+        // returns power:210, etc). The global power scanner then picked those
+        // as the "user farm total" and overwrote miner.power with 63042.
+        // Fix: only accept URLs that look like SOLO mining endpoints, AND
+        // explicitly REJECT any URL with /nft-game/ (Miner Wars namespace) or
+        // /clan-leaderboard/ etc.
+        const isMwUrl = /\/nft-game\/|\/clan-leaderboard\/|\/clan\/get-by(-id|-user)|\/round\/(get-state|get-last|find-by-cycleId)|\/rewards-by-user|\/get-total-reward-by-user|\/league\/(index|get-user-positions-data)|\/nft-game-bot|\/nft-game-token|\/nft-game-ability|\/nft-game-income|\/nft-game-user-profile|\/clan-rating|\/clan-message|\/league\/find-many|\/nft-game-round/i.test(url);
+        const isSoloMinerUrl = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)|\/nft-income|\/nft-collection|\/wallet\/find-by-user|\/ve-gomining-lock|\/home-page\/get-info/i.test(url);
+        if (isSoloMinerUrl && !isMwUrl) {
             const key = extractEndpointKey(url);
             DATA.miners[key] = {
                 url: url,
                 time: new Date().toISOString(),
                 data: data
             };
-            log('Données mineur: ' + key);
+            log('Données mineur (solo): ' + key);
+        } else if (!isMwUrl && (str.includes('th/s') || (str.includes('miner') && str.includes('nft')))) {
+            // Loose fallback for solo data we haven't catalogued yet — but still
+            // exclude MW URLs and require BOTH miner+nft keywords (not just 'power').
+            const key = extractEndpointKey(url);
+            DATA.miners[key] = {
+                url: url,
+                time: new Date().toISOString(),
+                data: data
+            };
+            log('Données mineur (loose): ' + key);
         }
 
         // Prix — capturer spécifiquement les prix GoMining internes
@@ -826,10 +856,18 @@
 
     // === Scan every captured response (DATA.miners + DATA.rewards) for
     //     a top-level field whose name suggests "total power / hashrate".
-    //     Returns the largest plausible value > minSum, or null. ===
+    //     Returns the largest plausible value > minSum, or null.
+    //
+    //     SAFETY: cap candidates at 5× minSum. The user's farm total is at
+    //     most a small multiple of the sum of their NFTs. Any value bigger
+    //     than that is almost certainly a LEAGUE or CLAN total leaking from
+    //     MW endpoints — REJECT it. ===
     function findFarmTotalAcrossResponses(minSum) {
         const POWER_FIELDS = /^(?:total[_\s]?power|farm[_\s]?power|total[_\s]?hashrate|computing[_\s]?power|displayed[_\s]?power|farm[_\s]?total|total[_\s]?th|total[_\s]?hash|hashrate|hashpower)$/i;
         const candidates = [];
+        // Hard ceiling: never trust a global-scan value bigger than 5× minSum
+        // (or 5000 TH if minSum is unset). Realistic mega-farms are <2000 TH.
+        const ceiling = Math.max(5000, (minSum || 0) * 5);
 
         function scan(obj, depth = 0) {
             if (!obj || depth > 8) return;
@@ -839,7 +877,7 @@
             }
             if (typeof obj !== 'object') return;
             for (const [k, v] of Object.entries(obj)) {
-                if (typeof v === 'number' && v > 50 && v < 1e7
+                if (typeof v === 'number' && v > 50 && v < ceiling
                     && POWER_FIELDS.test(k.replace(/[_\s]/g, ''))) {
                     candidates.push({ field: k, value: v });
                 }
@@ -847,13 +885,15 @@
             }
         }
 
+        // Only scan SOLO miner sources. DATA.miners is now strictly solo
+        // (see analyzeResponse allowlist). DATA.rewards is solo income.
         for (const m of Object.values(DATA.miners)) if (m.data) scan(m.data);
         for (const r of Object.values(DATA.rewards)) if (r.data) scan(r.data);
 
         if (!candidates.length) return null;
         // Prefer the largest plausible — that's typically the farm total
         const best = candidates.reduce((a, b) => b.value > a.value ? b : a);
-        try { console.log('[GoMining Extractor] Global scan candidates:', candidates, '→ chosen:', best); } catch {}
+        try { console.log('[GoMining Extractor] Global scan candidates:', candidates, '→ chosen:', best, '(ceiling:', ceiling, ')'); } catch {}
         return best.value;
     }
 
