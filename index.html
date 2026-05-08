@@ -4404,6 +4404,10 @@ function renderCalendar(history, chartEl) {
         }
 
         // ===== AUTO-SYNC LISTENER =====
+        // Only toast on the FIRST successful sync of this page-load. Subsequent
+        // syncs update data + the Connection Pulse pill silently — users don't
+        // want a popup every 30 seconds.
+        let _firstSyncToastShown = false;
         function checkAutoSync() {
             try {
                 const raw = localStorage.getItem('gomining_autosync');
@@ -4418,13 +4422,30 @@ function renderCalendar(history, chartEl) {
                 applyEssentials(data);
                 updateSyncStatus();
                 console.log('[GoMining] Auto-sync applied:', data.timestamp);
-                if (typeof toast === 'function') toast('Synced from extension', 'success', 2500);
+                // Toast only ONCE per page-load. After that, the Connection
+                // Pulse pill (top-nav) is the silent in-sync indicator.
+                if (!_firstSyncToastShown && typeof toast === 'function') {
+                    _firstSyncToastShown = true;
+                    toast('Synced from extension', 'success', 2500);
+                }
             } catch(e) {}
         }
 
         window.addEventListener('storage', (e) => {
             if (e.key === 'gomining_autosync') checkAutoSync();
         });
+        // Same-window writes don't fire StorageEvent — also listen for the
+        // CustomEvent the sync-bridge dispatches and a low-frequency poll.
+        document.addEventListener('gomining-autosync', () => checkAutoSync());
+        let _lastAutoSyncRaw = null;
+        setInterval(() => {
+            try {
+                const cur = localStorage.getItem('gomining_autosync');
+                if (cur && cur !== _lastAutoSyncRaw) { _lastAutoSyncRaw = cur; checkAutoSync(); }
+            } catch {}
+        }, 5000);
+        // Refresh the Connection Pulse pill's "X min ago" label every 30s.
+        setInterval(() => { try { updateSyncStatus(); } catch {} }, 30000);
 
         // ===== EXPORT / IMPORT =====
         function exportAllData() {
