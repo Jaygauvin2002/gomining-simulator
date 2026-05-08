@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MW Sample — GMSim Miner Wars logic sandbox</title>
+<style>
+:root{
+  --bg:#0a0e14; --panel:#0e1420; --ink:#e6edf3; --dim:#8b95a7; --border:#1f2937;
+  --green:#3fb950; --yellow:#d29922; --red:#f85149; --blue:#58a6ff; --purple:#bc8cff;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.55 system-ui,Segoe UI,Inter,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:18px 24px;border-bottom:1px solid var(--border);background:var(--panel)}
+header h1{margin:0;font-size:18px;letter-spacing:-.01em}
+header .sub{color:var(--dim);font-size:12px;margin-top:4px}
+main{padding:18px;max-width:1280px;margin:0 auto;display:grid;grid-template-columns:380px 1fr;gap:16px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px}
+.card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+.card h3{margin:14px 0 6px;font-size:12px;color:var(--blue);font-weight:600}
+button{background:#1a2230;color:var(--ink);border:1px solid var(--border);padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit}
+button:hover{background:#243046}
+button.primary{background:#1f6feb;border-color:#1f6feb}
+button.primary:hover{background:#388bfd}
+textarea,input{background:#0c1220;color:var(--ink);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font:inherit;width:100%}
+textarea{font-family:ui-monospace,Menlo,monospace;font-size:11px;min-height:120px}
+label{display:block;font-size:11px;color:var(--dim);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.kv{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;padding:4px 0;border-bottom:1px solid #131a26}
+.kv:last-child{border:0}
+.kv .k{color:var(--dim);font-size:12px}
+.kv .v{font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:600;color:var(--green);text-align:right}
+.kv .v.dim{color:var(--dim);font-weight:400}
+.kv .v.warn{color:var(--yellow)}
+.kv .v.err{color:var(--red)}
+.kv .src{font-size:9px;color:#4a5568;text-transform:uppercase;letter-spacing:.05em;grid-column:1/-1;text-align:right;margin-top:-2px}
+.banner{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.3);border-radius:8px;margin-bottom:14px}
+.banner.warn{background:rgba(210,153,34,.06);border-color:rgba(210,153,34,.3)}
+.banner.err{background:rgba(248,81,73,.06);border-color:rgba(248,81,73,.3)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 1.5s infinite}
+.dot.warn{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
+.dot.err{background:var(--red);box-shadow:0 0 6px var(--red);animation:none}
+@keyframes pulse{50%{opacity:.5}}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(63,185,80,.15);color:var(--green);font-weight:600;margin-left:6px}
+.tag.warn{background:rgba(210,153,34,.15);color:var(--yellow)}
+.tag.err{background:rgba(248,81,73,.15);color:var(--red)}
+pre.formula{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim);background:#0c1220;border:1px solid var(--border);border-radius:6px;padding:8px;margin:6px 0;white-space:pre-wrap;word-break:break-all}
+.formula .hl{color:var(--purple)}
+.formula .num{color:var(--green)}
+.endpoint-list{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim);max-height:140px;overflow:auto;padding:4px 8px;background:#0c1220;border:1px solid var(--border);border-radius:6px}
+.endpoint-list .ok{color:var(--green)}
+.endpoint-list .miss{color:var(--red)}
+hr{border:0;border-top:1px solid var(--border);margin:12px 0}
+.muted{color:var(--dim);font-size:11px}
+details{margin-top:8px}
+details summary{cursor:pointer;color:var(--blue);font-size:12px}
+details pre{font-size:10px;max-height:200px;overflow:auto;background:#0c1220;padding:8px;border-radius:4px;border:1px solid var(--border);color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚔️ MW Sample — Miner Wars logic sandbox</h1>
+  <div class="sub">Self-contained test page. Loads HAR fixtures, parses the 11 GoMining MW endpoints into a normalized shape, runs the math, shows provenance for every field. No connection to the rest of the simulator.</div>
+</header>
+<main>
+
+<!-- LEFT: Source picker + manual overrides -->
+<aside>
+  <div class="card">
+    <h2>1 · Data source</h2>
+    <div class="btn-row">
+      <button class="primary" id="btn-fixtures">Load HAR fixtures</button>
+      <button id="btn-localStorage">Read localStorage</button>
+      <button id="btn-clear">Clear</button>
+    </div>
+    <label>Or paste a single endpoint response (JSON):</label>
+    <textarea id="paste-json" placeholder='{"data": {...}}'></textarea>
+    <div class="row" style="margin-top:6px">
+      <input id="paste-url" placeholder="endpoint URL (e.g. /api/nft-game/clan/get-by-id)">
+      <button id="btn-paste">Add</button>
+    </div>
+    <div class="muted" style="margin-top:6px">Paste the URL + body of an endpoint to feed it through the parser. Useful when you only have one piece of data.</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>2 · Manual overrides</h2>
+    <div class="muted" style="margin-bottom:8px">Set these to test what-if scenarios. Live values used unless overridden.</div>
+    <div class="row">
+      <div><label>Your TH override</label><input id="ov-th" type="number" step="0.01" placeholder="auto"></div>
+      <div><label>Your W/TH override</label><input id="ov-wth" type="number" step="0.01" placeholder="auto"></div>
+    </div>
+    <div class="row">
+      <div><label>BTC price (USD)</label><input id="ov-btc" type="number" step="1" placeholder="auto"></div>
+      <div><label>GMT price (USD)</label><input id="ov-gmt" type="number" step="0.001" placeholder="auto"></div>
+    </div>
+    <div class="row">
+      <div><label>Mining mode PR (BTC/TH/day)</label><input id="ov-pr" type="number" step="0.0000001" placeholder="solo ceiling"></div>
+      <div><label>Service fee ($/TH/day)</label><input id="ov-svc" type="number" step="0.0001" value="0.0089"></div>
+    </div>
+    <button id="btn-recompute" class="primary" style="margin-top:6px">Recompute</button>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>3 · Endpoint coverage</h2>
+    <div class="endpoint-list" id="endpoint-list">— no data loaded —</div>
+  </div>
+</aside>
+
+<!-- RIGHT: Normalized live view + math -->
+<section>
+  <div id="banner" class="banner err">
+    <div class="dot err"></div>
+    <div><strong>No data</strong> — click <em>Load HAR fixtures</em> on the left, or paste a snapshot.</div>
+  </div>
+
+  <div class="card">
+    <h2>👤 You</h2>
+    <div id="kv-user"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🛡 Clan</h2>
+    <div id="kv-clan"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🏆 League</h2>
+    <div id="kv-league"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🎯 Current round</h2>
+    <div id="kv-round"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🤖 Spell bot</h2>
+    <div id="kv-bot"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>💰 Rewards</h2>
+    <div id="kv-rewards"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🎯 Week-end projection</h2>
+    <div id="proj-mode-row" style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="primary" data-mode="auto">Auto (best available)</button>
+      <button data-mode="live">Live only</button>
+      <button data-mode="prior">Prior cycles only</button>
+      <button data-mode="baseline">Statistical baseline</button>
+      <button data-mode="manual">Manual / no extension</button>
+    </div>
+    <div id="proj-manual" style="display:none;background:#0c1220;padding:10px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">
+      <div class="muted" style="margin-bottom:6px">No extension? Type your numbers. Privacy-friendly.</div>
+      <div class="row">
+        <div><label>Your TH</label><input id="mp-th" type="number" step="0.01" placeholder="e.g. 10"></div>
+        <div><label>Your W/TH</label><input id="mp-wth" type="number" step="0.01" placeholder="e.g. 15"></div>
+      </div>
+      <div class="row">
+        <div><label>League (max ×)</label>
+          <select id="mp-league">
+            <option value="32">Dune (×32)</option>
+            <option value="64">Horizon (×64)</option>
+            <option value="128">Eclipse (×128)</option>
+            <option value="256">Odyssey (×256)</option>
+          </select>
+        </div>
+        <div><label>Clan total TH</label><input id="mp-clan-th" type="number" step="1" placeholder="e.g. 210"></div>
+      </div>
+      <div class="row">
+        <div><label>League total TH</label><input id="mp-league-th" type="number" step="100" placeholder="e.g. 63000"></div>
+        <div><label>League BTC fund</label><input id="mp-fund" type="number" step="0.0001" placeholder="e.g. 0.0485"></div>
+      </div>
+      <div class="row">
+        <div><label>Cycle elapsed (days)</label><input id="mp-elapsed" type="number" step="0.1" min="0" max="7" value="3.5"></div>
+        <div><label>Clan luck factor</label><input id="mp-luck" type="number" step="0.05" value="1" placeholder="1 = avg, &lt;1 unlucky, &gt;1 lucky"></div>
+      </div>
+      <div class="row">
+        <div><label>Electricity ($/kWh)</label><input id="mp-elec" type="number" step="0.001" value="0.05"></div>
+        <div><label>(service fee + excess tax come from above)</label><input disabled value="auto"></div>
+      </div>
+    </div>
+    <div id="proj-block"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🧱 Block-pace projection</h2>
+    <div class="muted" style="margin-bottom:8px">
+      Different angle on the same math: "if our clan keeps winning N blocks/day, how much BTC do we get by week's end?"
+      Use the live pace (auto-detected from cycle history) <em>or</em> type your own hypothetical.
+    </div>
+    <div class="row">
+      <div>
+        <label>Hypothetical blocks/week (override)</label>
+        <input id="bp-hypothetical" type="number" step="1" min="0" placeholder="e.g. 70 — leave blank to use live pace">
+      </div>
+      <div>
+        <label>Avg BTC/block (override)</label>
+        <input id="bp-btc-per-block" type="number" step="0.000001" placeholder="auto: leagueFund / leagueRoundsPerCycle">
+      </div>
+    </div>
+    <div id="block-pace-block" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🧮 Math</h2>
+    <div id="math-block"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🔬 Raw normalized snapshot</h2>
+    <details><summary>Show full live.* object</summary><pre id="raw-dump">—</pre></details>
+  </div>
+</section>
+
+</main>
+
+<script id="fixtures-data" type="application/json">[{"url":"https://api.gomining.com/api/nft-game/clan-leaderboard/index-v2","data":{"data":{"count":55,"totalMinedBlocks":856,"btcFund":"0.048465980361081053","status":"active","me":{"id":43340,"image":"https://storage.googleapis.com/gmt-gendalf-prod/4a548171-f42b-4f34-814b-1912b048c536-IMG_1858.gif","isDeleted":false,"name":"\ud83d\udc51 VLP Miners \ud83d\udc51"},"clansPromoted":[{"blocksMined":194,"btcMined":0,"clanId":41419,"nftPower":25096.11269999999,"position":1,"clan":{"id":41419,"image":"https://storage.googleapis.com/gmt-gendalf-prod/c447b187-b4e1-44be-a28b-3b595c7c81c7-IMG_0011.jpeg","isDeleted":false,"name":"\ud83c\udfc6The Cryptonauts\ud83e\udd47"}}],"clansRelegated":[],"clansRemaining":[{"blocksMined":100,"btcMined":0,"clanId":40850,"nftPower":4148.0087,"position":2,"clan":{"id":40850,"image":null,"isDeleted":false,"name":"Megahash Legion"}},{"blocksMined":95,"btcMined":0,"clanId":42388,"nftPower":3118.4441,"position":3,"clan":{"id":42388,"image":null,"isDeleted":false,"name":"\ud83d\udc7d EZ 1337 \ud83d\udc7d"}},{"blocksMined":68,"btcMined":0,"clanId":43192,"nftPower":2449.9403,"position":4,"clan":{"id":43192,"image":null,"isDeleted":false,"name":"AKA Mining"}}],"totalPower":63042.556499999955,"weightedEnergyEfficiencyPerTh":18.165025466893027}}},{"url":"https://api.gomining.com/api/nft-game/clan/get-by-id","data":{"data":{"id":43340,"createdAt":"2026-04-22T00:03:19.148Z","name":"\ud83d\udc51 VLP Miners \ud83d\udc51","description":"Welcome to VLP, Booster Priority \nBoost Requirements , Teamwork Boost \nThe right strategy can help everyone grow faster\n(https://discord.gg/Fv3T6XRDpn)","myProfile":{"id":2974235,"alias":"vxrxn","power":10.262,"ee":15,"isOwner":false,"avatar":{"smallImageUrl":null},"joinDate":"2026-05-05T12:03:55.468Z","usedNftGameAbilities":[{"nftGameAbilityId":"2ec728e7-f31f-4df3-b486-5e82a4976563","count":48},{"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99","count":2},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":1},{"nftGameAbilityId":"592724c5-1f59-43b2-af13-2de8d2c97a9d","count":1},{"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1","count":3},{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":8}]},"usersForClient":[{"id":5071231,"alias":"VLP \u2719 JJ \u3221","power":15.344100000000001,"ee":14.99,"isOwner":false,"avatar":{"smallImageUrl":null},"joinDate":"2026-04-22T00:08:10.867688","usedNftGameAbilities":[{"nftGameAbilityId":"17831b5e-afdf-4cb7-98d7-3a60d81e19ae","count":1},{"nftGameAbilityId":"2ebfd30d-2950-46fc-b3e9-498a924fd021","count":1},{"nftGameAbilityId":"2ec728e7-f31f-4df3-b486-5e82a4976563","count":40},{"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99","count":4},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":290},{"nftGameAbilityId":"592724c5-1f59-43b2-af13-2de8d2c97a9d","count":169},{"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1","count":209},{"nftGameAbilityId":"646d3c76-fe06-414f-8d39-eb0aa7da429a","count":152},{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":302}]},{"id":5055427,"alias":"Keler","power":2.0064,"ee":14.99,"isOwner":false,"avatar":{"smallImageUrl":"https://storage.googleapis.com/gcs-gmt-bonus-miner-prod/ca022a56-c40b-49cd-8a2e-1a68c99c46c3--small-bg.png"},"joinDate":"2026-04-30T10:10:57.059886","usedNftGameAbilities":[{"nftGameAbilityId":"2ec728e7-f31f-4df3-b486-5e82a4976563","count":1}]},{"id":4970175,"alias":"Mineix \ud83d\udcb0","power":76.2683,"ee":15,"isOwner":false,"avatar":{"smallImageUrl":null},"joinDate":"2026-05-05T03:09:55.491357","usedNftGameAbilities":[{"nftGameAbilityId":"17831b5e-afdf-4cb7-98d7-3a60d81e19ae","count":28},{"nftGameAbilityId":"2ec728e7-f31f-4df3-b486-5e82a4976563","count":79},{"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99","count":142},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":666},{"nftGameAbilityId":"592724c5-1f59-43b2-af13-2de8d2c97a9d","count":2},{"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1","count":71},{"nftGameAbilityId":"646d3c76-fe06-414f-8d39-eb0aa7da429a","count":9},{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":72},{"nftGameAbilityId":"a74dd2e0-14a9-46e3-86e5-1f1e8ab1f5c4","count":2},{"nftGameAbilityId":"a7554d7f-0e50-45e0-ab01-6ac8db629bfd","count":11}]},{"id":4882158,"alias":"\u2606\u2606\u2606Sainte\u2605\u2605\u2605","power":42.0463,"ee":14.99,"isOwner":true,"avatar":{"smallImageUrl":null},"joinDate":null,"usedNftGameAbilities":[{"nftGameAbilityId":"17831b5e-afdf-4cb7-98d7-3a60d81e19ae","count":2},{"nftGameAbilityId":"2ec728e7-f31f-4df3-b486-5e82a4976563","count":60},{"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99","count":2},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":262},{"nftGameAbilityId":"592724c5-1f59-43b2-af13-2de8d2c97a9d","count":132},{"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1","count":27},{"nftGameAbilityId":"646d3c76-fe06-414f-8d39-eb0aa7da429a","count":171},{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":359},{"nftGameAbilityId":"a74dd2e0-14a9-46e3-86e5-1f1e8ab1f5c4","count":1}]},{"id":2974235,"alias":"vxrxn","power":10.262,"ee":15,"isOwner":false,"avatar":{"smallImageUrl":null},"joinDate":"2026-05-05T12:03:55.468444","usedNftGameAbilities":[{"nftGameAbilityId":"2ec728e7-f31f-4df3-b486-5e82a4976563","count":48},{"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99","count":2},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":1},{"nftGameAbilityId":"592724c5-1f59-43b2-af13-2de8d2c97a9d","count":1},{"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1","count":3},{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":8}]},{"id":2246587,"alias":"VLP \u2719 V \u2719 \u3220","power":64.1367,"ee":15,"isOwner":false,"avatar":{"smallImageUrl":null},"joinDate":"2026-04-22T00:04:13.644961","usedNftGameAbilities":[{"nftGameAbilityId":"17831b5e-afdf-4cb7-98d7-3a60d81e19ae","count":3},{"nftGameAbilityId":"2ec728e7-f31f-4df3-b486-5e82a4976563","count":69},{"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99","count":5},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":378},{"nftGameAbilityId":"592724c5-1f59-43b2-af13-2de8d2c97a9d","count":190},{"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1","count":41},{"nftGameAbilityId":"646d3c76-fe06-414f-8d39-eb0aa7da429a","count":192},{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":368},{"nftGameAbilityId":"a74dd2e0-14a9-46e3-86e5-1f1e8ab1f5c4","count":2}]}],"usersCount":6,"nftsCount":29,"power":210.0638,"clanLogo":{"link":"https://storage.googleapis.com/gmt-gendalf-prod/4a548171-f42b-4f34-814b-1912b048c536-IMG_1858.gif","approved":true,"rejected":null},"type":"open","leagueId":22,"isOwner":false,"powerShare":0.5138696331423299,"scoreShare":3.5614406107277725,"blocksShare":2.6455026455026456,"luck":0.7428181274549017,"weightedEffectiveness":6.930630613351181,"blocksMined":119,"btcIncome":0.0033261237776026947,"gmtIncome":162.81996593335856,"clanRank":11,"telegramName":null,"joinRequirements":[{"data":{"value":20},"type":"min-gmt"},{"data":{"value":0},"type":"min-th"}]}}},{"url":"https://api.gomining.com/api/nft-game/clan/get-my","data":{"data":{"id":43340,"createdAt":"2026-04-22T00:03:19.148Z","name":"\ud83d\udc51 VLP Miners \ud83d\udc51","description":"Welcome to VLP, Booster Priority \nBoost Requirements , Teamwork Boost \nThe right strategy can help everyone grow faster\n(https://discord.gg/Fv3T6XRDpn)","usersCount":6,"nftsCount":35,"power":306.0638,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/4a548171-f42b-4f34-814b-1912b048c536-IMG_1858.gif","type":"open","leagueId":22,"isOwner":false,"roundStartClanId":43340}}},{"url":"https://api.gomining.com/api/nft-game/round/get-state","data":{"data":{"type":"clans","array":[{"me":false,"power":25096.11269999999,"basePoints":22321.211320212307,"clanName":"\ud83c\udfc6The Cryptonauts\ud83e\udd47","clanLogo":"https://storage.googleapis.com/gmt-gendalf-prod/c447b187-b4e1-44be-a28b-3b595c7c81c7-IMG_0011.jpeg","currentAddedScore":1722600,"activeBoostScore":1800,"usedAbilities":[{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":1,"usedAtTimestamps":[1778189224573]}],"score":23106320.444763392,"chance":0.2865183536604177},{"me":false,"power":109.145,"basePoints":145.52666666666664,"clanName":"MineWin","clanLogo":null,"currentAddedScore":15649501,"activeBoostScore":16352,"usedAbilities":[{"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1","count":1,"usedAtTimestamps":[1778189224573]},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":1,"usedAtTimestamps":[1778189224573]},{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":1,"usedAtTimestamps":[1778189224573]}],"score":15788915.546666667,"chance":0.19578253921167027},{"me":false,"power":4763.3779,"basePoints":5575.234953240717,"clanName":"\u26a1\ud83c\udd8eCARMAGEDON\ud83c\udd8e\u26a1","clanLogo":"https://storage.googleapis.com/gmt-gendalf-prod/bc1b7a4a-9bf4-424e-bf8c-1576d3b88cef-Carmageddon.png","currentAddedScore":0,"activeBoostScore":0,"usedAbilities":[],"score":5341075.085204607,"chance":0.06622932646709295},{"me":false,"power":4148.0087,"basePoints":5078.429953799696,"clanName":"Megahash Legion","clanLogo":null,"currentAddedScore":0,"activeBoostScore":0,"usedAbilities":[],"score":4865135.895740109,"chance":0.0603276809266951},{"me":false,"power":3118.4441,"basePoints":3619.0444245706835,"clanName":"\ud83d\udc7d EZ 1337 \ud83d\udc7d","clanLogo":null,"currentAddedScore":400000,"activeBoostScore":0,"usedAbilities":[{"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99","count":1,"usedAtTimestamps":[1778189768018]}],"score":3867044.558738715,"chance":0.04795134920551124}],"me":{"rank":34,"chance":0.0033278138997161577,"me":true,"power":210.06380000000001,"basePoints":280.13789904380695,"clanName":"\ud83d\udc51 VLP Miners \ud83d\udc51","clanLogo":"https://storage.googleapis.com/gmt-gendalf-prod/4a548171-f42b-4f34-814b-1912b048c536-IMG_1858.gif","currentAddedScore":0,"activeBoostScore":0,"usedAbilities":[],"score":268372.1072839671},"count":50}}},{"url":"https://api.gomining.com/api/nft-game/round/get-last","data":{"data":{"id":1028218,"createdAt":"2026-05-07T21:27:04.411Z","updatedAt":"2026-05-07T21:27:06.367Z","winnerClanId":null,"hash":null,"blockNumber":948367,"active":true,"startedAt":"2026-05-07T21:27:04.573Z","endedAt":null,"power":0,"winnerInfo":null,"leagueId":22,"nftRate":1,"multiplier":4,"customMultipliers":null,"winnerUserId":null,"cycleId":142,"winnerNftId":null,"league":{"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},"userRounds":[{"power":1818.3856999999985,"basePoints":1780.4136785750477,"clanId":2682,"clan":{"id":2682},"userId":null},{"power":300.09820000000013,"basePoints":319.8836187329449,"clanId":11803,"clan":{"id":11803},"userId":null},{"power":531.8234999999995,"basePoints":624.0535736972895,"clanId":31162,"clan":{"id":31162},"userId":null},{"power":206.82270000000005,"basePoints":209.08898410245467,"clanId":32360,"clan":{"id":32360},"userId":null},{"power":762.2174000000002,"basePoints":826.7498431987484,"clanId":32584,"clan":{"id":32584},"userId":null},{"power":102.64899999999997,"basePoints":125.73106972620116,"clanId":33564,"clan":{"id":33564},"userId":null},{"power":2123.586799999999,"basePoints":2307.9068619380664,"clanId":33844,"clan":{"id":33844},"userId":null},{"power":341.61199999999997,"basePoints":450.8609197065876,"clanId":33999,"clan":{"id":33999},"userId":null},{"power":1232.1786,"basePoints":1450.57813834924,"clanId":34029,"clan":{"id":34029},"userId":null},{"power":8.0064,"basePoints":10.675199999999998,"clanId":35336,"clan":{"id":35336},"userId":null},{"power":372.4334999999999,"basePoints":413.8579409607433,"clanId":36828,"clan":{"id":36828},"userId":null},{"power":274.77349999999996,"basePoints":338.88403283573126,"clanId":37842,"clan":{"id":37842},"userId":null},{"power":946.1138999999996,"basePoints":957.0072619542686,"clanId":37934,"clan":{"id":37934},"userId":null},{"power":259.3151,"basePoints":309.52866131965243,"clanId":38583,"clan":{"id":38583},"userId":null},{"power":1983.2606999999998,"basePoints":2644.670601467645,"clanId":39439,"clan":{"id":39439},"userId":null},{"power":789.4639999999999,"basePoints":709.0306162936436,"clanId":39509,"clan":{"id":39509},"userId":null},{"power":191.72700000000003,"basePoints":255.636,"clanId":39770,"clan":{"id":39770},"userId":null},{"power":224.032,"basePoints":298.8872354013787,"clanId":39986,"clan":{"id":39986},"userId":null},{"power":126.5144,"basePoints":168.06695986245697,"clanId":40190,"clan":{"id":40190},"userId":null},{"power":4148.0087,"basePoints":5078.429953799696,"clanId":40850,"clan":{"id":40850},"userId":null},{"power":262.57830000000007,"basePoints":247.17239548876555,"clanId":40903,"clan":{"id":40903},"userId":null},{"power":204.2978,"basePoints":272.39706666666666,"clanId":40992,"clan":{"id":40992},"userId":null},{"power":602.9341,"basePoints":804.1806566155215,"clanId":41261,"clan":{"id":41261},"userId":null},{"power":246.25470000000004,"basePoints":282.8970743872977,"clanId":41305,"clan":{"id":41305},"userId":null},{"power":25096.11269999999,"basePoints":22321.211320212307,"clanId":41419,"clan":{"id":41419},"userId":null},{"power":339.1244,"basePoints":359.84183058171755,"clanId":41555,"clan":{"id":41555},"userId":null},{"power":1283.9056,"basePoints":1098.2819019102533,"clanId":41639,"clan":{"id":41639},"userId":null},{"power":118.4064,"basePoints":114.01675493500241,"clanId":41671,"clan":{"id":41671},"userId":null},{"power":254.4515,"basePoints":318.2025162492736,"clanId":41695,"clan":{"id":41695},"userId":null},{"power":369.52930000000003,"basePoints":487.505672823219,"clanId":41700,"clan":{"id":41700},"userId":null},{"power":1911.2402000000002,"basePoints":1238.2508584386137,"clanId":41790,"clan":{"id":41790},"userId":null},{"power":241.7201,"basePoints":266.8122139256125,"clanId":42014,"clan":{"id":42014},"userId":null},{"power":632.2255,"basePoints":522.5104199627643,"clanId":42167,"clan":{"id":42167},"userId":null},{"power":322.626,"basePoints":403.7715923885205,"clanId":42313,"clan":{"id":42313},"userId":null},{"power":3118.4441,"basePoints":3619.0444245706835,"clanId":42388,"clan":{"id":42388},"userId":null},{"power":284.13990000000007,"basePoints":379.1059372915277,"clanId":42660,"clan":{"id":42660},"userId":null},{"power":41.0064,"basePoints":53.63819489862656,"clanId":43023,"clan":{"id":43023},"userId":null},{"power":19.4825,"basePoints":25.976666666666667,"clanId":43098,"clan":{"id":43098},"userId":null},{"power":2449.9403,"basePoints":2536.576712986889,"clanId":43192,"clan":{"id":43192},"userId":null},{"power":451.4541000000001,"basePoints":559.0546761195108,"clanId":43209,"clan":{"id":43209},"userId":null},{"power":470.0064,"basePoints":582.7729696218228,"clanId":43228,"clan":{"id":43228},"userId":null},{"power":117.8835,"basePoints":136.50917813211845,"clanId":43270,"clan":{"id":43270},"userId":null},{"power":53.9364,"basePoints":71.9152,"clanId":43334,"clan":{"id":43334},"userId":null},{"power":199.80180000000001,"basePoints":266.4552323771403,"clanId":43340,"clan":{"id":43340},"userId":null},{"power":71.3815,"basePoints":94.49192512512512,"clanId":43483,"clan":{"id":43483},"userId":null},{"power":2151.5414,"basePoints":2611.8524667396937,"clanId":43501,"clan":{"id":43501},"userId":null},{"power":4763.3779,"basePoints":5575.234953240717,"clanId":43743,"clan":{"id":43743},"userId":null},{"power":11.3994,"basePoints":15.208252079163886,"clanId":43769,"clan":{"id":43769},"userId":null},{"power":90.9242,"basePoints":121.31314209472981,"clanId":43803,"clan":{"id":43803},"userId":null},{"power":109.145,"basePoints":145.52666666666664,"clanId":43826,"clan":{"id":43826},"userId":null},{"power":10.262,"basePoints":13.682666666666666,"clanId":43340,"clan":{"id":43340},"userId":2974235}],"userState":null,"allClansState":[{"clanId":41419,"currentAddedScore":1990800,"activeBoostScore":1800,"usedAbilities":[{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":1,"usedAtTimestamps":[1778189224573]}],"clanPower":59,"clanPowerUpAbilityUsageCounter":0},{"clanId":43826,"currentAddedScore":18086049,"activeBoostScore":16352,"usedAbilities":[{"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1","count":1,"usedAtTimestamps":[1778189224573]},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":1,"usedAtTimestamps":[1778189224573]},{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":1,"usedAtTimestamps":[1778189224573]}],"clanPower":109,"clanPowerUpAbilityUsageCounter":0},{"clanId":43769,"currentAddedScore":11999,"activeBoostScore":15,"usedAbilities":[{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":1,"usedAtTimestamps":[1778189541543]}],"clanPower":10,"clanPowerUpAbilityUsageCounter":0},{"clanId":41305,"currentAddedScore":1070997,"activeBoostScore":2082,"usedAbilities":[{"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","count":1,"usedAtTimestamps":[1778189751171]},{"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","count":1,"usedAtTimestamps":[1778189826719]}],"clanPower":52,"clanPowerUpAbilityUsageCounter":0},{"clanId":42388,"currentAddedScore":400000,"activeBoostScore":0,"usedAbilities":[{"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99","count":1,"usedAtTimestamps":[1778189768018]}],"clanPower":47,"clanPowerUpAbilityUsageCounter":0}],"percents":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}],"nftGameAbilities":[{"id":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","data":{"value":1800,"multiply":1},"availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","description":"Boost 1800th","icon":null,"name":"Boost X1","priceInGMT":1,"subtype":"basic","type":"boost","freeUsageCount":0},{"id":"17831b5e-afdf-4cb7-98d7-3a60d81e19ae","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","data":{"value":1800,"multiply":10},"availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","description":"Boost 18000th","icon":null,"name":"Boost X10","priceInGMT":10,"subtype":"pro","type":"boost","freeUsageCount":0},{"id":"e7af0c32-1409-4b22-9e0b-99e7ea4939df","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","data":{"value":1800,"multiply":100},"availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","description":"Boost 180000th","icon":null,"name":"Boost X100","priceInGMT":100,"subtype":"ultra","type":"boost","freeUsageCount":0},{"id":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","createdAt":"2025-07-21T15:15:53.871Z","updatedAt":"2025-07-21T15:15:53.871Z","data":{"coefUsageRatios":[{"max":4,"min":1,"coef":1},{"max":9,"min":5,"coef":1.3},{"max":29,"min":10,"coef":1.7},{"max":49,"min":30,"coef":2.2},{"max":99,"min":50,"coef":2.9},{"max":199,"min":100,"coef":3.8},{"max":499,"min":200,"coef":4.9},{"max":null,"min":500,"coef":6.4}],"boostProfitRatio":0,"usagePerRoundByClan":1000,"usagePerRoundByUser":1},"availableFrom":"2025-07-22T00:00:00.000Z","availableTo":"2125-07-22T00:00:00.000Z","description":"Clan Power up boost","icon":null,"name":"Clan Power Up Boost","priceInGMT":0.16,"subtype":"basic","type":"clanPowerUp","freeUsageCount":0},{"id":"370be7b3-d843-4e2f-a23a-eeea37648f99","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","data":{"value":400000,"multiply":1,"activationDelayInSec":3},"availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","description":"Instant boost 400000 score","icon":null,"name":"Instant Boost","priceInGMT":1,"subtype":"basic","type":"instantBoost","freeUsageCount":0},{"id":"a7554d7f-0e50-45e0-ab01-6ac8db629bfd","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","data":{"value":400000,"multiply":10,"activationDelayInSec":3},"availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","description":"Instant boost 4000000 score","icon":null,"name":"Instant Boost","priceInGMT":10,"subtype":"pro","type":"instantBoost","freeUsageCount":0},{"id":"2ec728e7-f31f-4df3-b486-5e82a4976563","createdAt":"2024-09-19T13:39:05.503Z","updatedAt":"2024-09-19T13:39:07.503Z","data":{},"availableFrom":"2024-09-19T13:39:05.503Z","availableTo":"2124-12-30T23:50:59.999Z","description":"Instant boost and service discount","icon":null,"name":"Maintenance","priceInGMT":0,"subtype":"basic","type":"service","freeUsageCount":0},{"id":"8b6fad11-cfc1-4922-ad17-30c41cee39b9","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","data":{"value":400000,"multiply":100,"activationDelayInSec":3},"availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","description":"Instant boost 40000000 score","icon":null,"name":"Instant Boost","priceInGMT":100,"subtype":"ultra","type":"instantBoost","freeUsageCount":0},{"id":"646d3c76-fe06-414f-8d39-eb0aa7da429a","createdAt":"2025-06-05T17:18:59.620Z","updatedAt":"2025-06-05T17:18:59.620Z","data":{"value":70000,"multiply":1,"intervalInSec":120},"availableFrom":"2025-06-10T00:00:00.000Z","availableTo":"2125-06-10T00:00:00.000Z","description":"Echo boost 100000 score","icon":null,"name":"Echo Boost","priceInGMT":1,"subtype":"basic","type":"echoBoost","freeUsageCount":0},{"id":"2ebfd30d-2950-46fc-b3e9-498a924fd021","createdAt":"2025-06-05T17:18:59.620Z","updatedAt":"2025-06-05T17:18:59.620Z","data":{"value":70000,"multiply":10,"intervalInSec":120},"availableFrom":"2025-06-10T00:00:00.000Z","availableTo":"2125-06-10T00:00:00.000Z","description":"Echo boost 1000000 score","icon":null,"name":"Echo Boost","priceInGMT":10,"subtype":"pro","type":"echoBoost","freeUsageCount":0},{"id":"0ffad19c-8091-4527-a600-b7c2f238147d","createdAt":"2025-06-05T17:18:59.620Z","updatedAt":"2025-06-05T17:18:59.620Z","data":{"value":70000,"multiply":100,"intervalInSec":120},"availableFrom":"2025-06-10T00:00:00.000Z","availableTo":"2125-06-10T00:00:00.000Z","description":"Echo boost 10000000 score","icon":null,"name":"Echo Boost","priceInGMT":100,"subtype":"ultra","type":"echoBoost","freeUsageCount":0},{"id":"5d6f8166-0f20-486f-b920-e898ca94dcc1","createdAt":"2025-07-03T11:35:25.331Z","updatedAt":"2025-07-03T11:35:25.331Z","data":{"value":100,"usagePerRound":1,"boostProfitRatio":0.3},"availableFrom":"2025-07-08T00:00:00.000Z","availableTo":"2125-07-08T00:00:00.000Z","description":"Power up boost","icon":null,"name":"Power Up Boost","priceInGMT":0.53,"subtype":"basic","type":"powerUp","freeUsageCount":0},{"id":"592724c5-1f59-43b2-af13-2de8d2c97a9d","createdAt":"2025-06-23T09:45:11.437Z","updatedAt":"2025-06-23T09:45:11.437Z","data":{"value":1000000,"multiply":1,"durationInSec":300,"activationDelayInSec":3},"availableFrom":"2025-06-24T00:00:00.000Z","availableTo":"2125-06-24T00:00:00.000Z","description":"Timewrap boost 1000000 score","icon":null,"name":"Timewrap Boost","priceInGMT":1,"subtype":"basic","type":"timewrap","freeUsageCount":0},{"id":"a74dd2e0-14a9-46e3-86e5-1f1e8ab1f5c4","createdAt":"2025-06-23T09:45:11.437Z","updatedAt":"2025-06-23T09:45:11.437Z","data":{"value":1000000,"multiply":10,"durationInSec":300,"activationDelayInSec":3},"availableFrom":"2025-06-24T00:00:00.000Z","availableTo":"2125-06-24T00:00:00.000Z","description":"Timewrap boost 10000000 score","icon":null,"name":"Timewrap Boost","priceInGMT":10,"subtype":"pro","type":"timewrap","freeUsageCount":0},{"id":"bea03b75-6dbf-4a99-a2c9-24dfe79a3ea1","createdAt":"2025-06-23T09:45:11.437Z","updatedAt":"2025-06-23T09:45:11.437Z","data":{"value":1000000,"multiply":100,"durationInSec":300,"activationDelayInSec":3},"availableFrom":"2025-06-24T00:00:00.000Z","availableTo":"2125-06-24T00:00:00.000Z","description":"Timewrap boost 100000000 score","icon":null,"name":"Timewrap Boost","priceInGMT":100,"subtype":"ultra","type":"timewrap","freeUsageCount":0}],"isUserInCorrectLeague":true,"firstRoundStartedAt":"2026-03-23T19:13:41.381Z","previousRoundId":1028208,"vipDiscount":0,"botBalanceValueNumeric":"2403604344571869300"}}},{"url":"https://api.gomining.com/api/nft-game/round/find-by-cycleId","data":{"data":{"array":[{"id":1027199,"createdAt":"2026-05-07T14:57:16.097Z","updatedAt":"2026-05-07T15:11:12.876Z","hash":"00000000000000000001c1f36669ed01316c9eaa4c1114752649ab367fb00d5f","active":false,"blockNumber":948327,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T15:11:09.099Z","leagueId":22,"multiplier":2,"nftRate":1,"power":55891.17,"winnerClanId":36828,"winnerUserId":2823892,"startedAt":"2026-05-07T14:57:17.064Z","clanWinner":{"clan":{"id":36828,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/94531286-83f6-4b5b-b22b-1d385052cbac-IMG_4716.jpeg","name":"\u26d3\ufe0f UNDERDOGS \u26d3\ufe0f","isDeleted":false},"score":2705450.7600000002,"position":6,"btcReward":null,"chanceToWin":4.98,"usedAbilities":[]},"userWinner":{"clan":{"id":36828,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/94531286-83f6-4b5b-b22b-1d385052cbac-IMG_4716.jpeg","name":"\u26d3\ufe0f UNDERDOGS \u26d3\ufe0f","isDeleted":false},"user":{"id":2823892,"alias":"\u26d3\ufe0f\ud83d\udc09DragonOnFire\ud83d\udc09\u26d3\ufe0f","avatar":"https://storage.googleapis.com/gcs-gmt-bonus-miner-prod/ec543114-f049-4e22-bc1c-b148ae52168c--big-bg.png"},"score":2386504.03,"position":3,"gmtReward":null,"chanceToWin":4.39,"usedAbilities":[]}},{"id":1027155,"createdAt":"2026-05-07T14:52:36.409Z","updatedAt":"2026-05-07T14:57:14.220Z","hash":"00000000000000000001971698080b072e73af7b9cef6d4df43d924c8e1bea2c","active":false,"blockNumber":948326,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T14:57:09.073Z","leagueId":22,"multiplier":2,"nftRate":1,"power":55891.17,"winnerClanId":43501,"winnerUserId":2037309,"startedAt":"2026-05-07T14:52:37.149Z","clanWinner":{"clan":{"id":43501,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/36e289cf-0ae6-430c-afd3-fdbcebfab38d-Futuristic CRYPTOSHARES logo design.png","name":"cryptoshares.club","isDeleted":false},"score":1305464.29,"position":5,"btcReward":null,"chanceToWin":6.65,"usedAbilities":[{"count":1,"nftGameAbilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4"},{"count":1,"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7"}]},"userWinner":{"clan":{"id":43501,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/36e289cf-0ae6-430c-afd3-fdbcebfab38d-Futuristic CRYPTOSHARES logo design.png","name":"cryptoshares.club","isDeleted":false},"user":{"id":2037309,"alias":"Gossamer ","avatar":null},"score":530398.15,"position":6,"gmtReward":null,"chanceToWin":2.7,"usedAbilities":[]}},{"id":1027134,"createdAt":"2026-05-07T14:31:48.939Z","updatedAt":"2026-05-07T14:52:34.011Z","hash":"00000000000000000001edf6dab675466b23773aa528ec04c333a63fee992ecd","active":false,"blockNumber":948325,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T14:52:30.151Z","leagueId":22,"multiplier":1,"nftRate":1,"power":55915.85,"winnerClanId":42388,"winnerUserId":3617527,"startedAt":"2026-05-07T14:31:49.717Z","clanWinner":{"clan":{"id":42388,"logo":null,"name":"\ud83d\udc7d EZ 1337 \ud83d\udc7d","isDeleted":false},"score":23300752.429999992,"position":1,"btcReward":null,"chanceToWin":25.49,"usedAbilities":[{"count":3,"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7"},{"count":1,"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99"},{"count":1,"nftGameAbilityId":"17831b5e-afdf-4cb7-98d7-3a60d81e19ae"}]},"userWinner":{"clan":{"id":42388,"logo":null,"name":"\ud83d\udc7d EZ 1337 \ud83d\udc7d","isDeleted":false},"user":{"id":3617527,"alias":"bc006f08-6e93-45ab-9da0-8c6772393180","avatar":null},"score":18517690.24,"position":1,"gmtReward":null,"chanceToWin":20.26,"usedAbilities":[{"count":3,"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7"},{"count":1,"nftGameAbilityId":"370be7b3-d843-4e2f-a23a-eeea37648f99"},{"count":1,"nftGameAbilityId":"17831b5e-afdf-4cb7-98d7-3a60d81e19ae"}]}},{"id":1027102,"createdAt":"2026-05-07T14:28:21.624Z","updatedAt":"2026-05-07T14:31:47.364Z","hash":"00000000000000000001fc0e8570b04c82934dbcfbd4a5795b00d8568dc4dade","active":false,"blockNumber":948324,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T14:31:41.911Z","leagueId":22,"multiplier":1,"nftRate":1,"power":55915.75,"winnerClanId":40850,"winnerUserId":101203,"startedAt":"2026-05-07T14:28:24.361Z","clanWinner":{"clan":{"id":40850,"logo":null,"name":"Megahash Legion","isDeleted":false},"score":1000450.52,"position":3,"btcReward":null,"chanceToWin":8.64,"usedAbilities":[]},"userWinner":{"clan":{"id":40850,"logo":null,"name":"Megahash Legion","isDeleted":false},"user":{"id":101203,"alias":"LudoC","avatar":null},"score":36859.85,"position":47,"gmtReward":null,"chanceToWin":0.31,"usedAbilities":[]}},{"id":1027087,"createdAt":"2026-05-07T14:23:57.270Z","updatedAt":"2026-05-07T14:28:19.044Z","hash":"0000000000000000000180a74e505d4cd9f2442bdd50b7ffba9f3c3697c3bedc","active":false,"blockNumber":948323,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T14:28:14.966Z","leagueId":22,"multiplier":1,"nftRate":1,"power":55896.33,"winnerClanId":33844,"winnerUserId":2895339,"startedAt":"2026-05-07T14:23:59.070Z","clanWinner":{"clan":{"id":33844,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/73f7b593-641b-4965-910b-0724f2236c19-11487292 2.png","name":"GreenSerenity \ud83c\uddf7\ud83c\uddf4\ud83c\udf40","isDeleted":false},"score":588515.550000001,"position":9,"btcReward":null,"chanceToWin":3.93,"usedAbilities":[]},"userWinner":{"clan":{"id":33844,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/73f7b593-641b-4965-910b-0724f2236c19-11487292 2.png","name":"GreenSerenity \ud83c\uddf7\ud83c\uddf4\ud83c\udf40","isDeleted":false},"user":{"id":2895339,"alias":"\u26a1\ufe0f \ua9c1 \u2620\ufe0fCaP\u2019TaiN \u2620\ufe0f \ua9c2 \u26a1\ufe0f","avatar":"https://storage.googleapis.com/gcs-gmt-bonus-miner-prod/888205ae-8bd3-43f2-950a-4adb35655bb6--big-bg.png"},"score":333122,"position":10,"gmtReward":null,"chanceToWin":2.22,"usedAbilities":[]}},{"id":1027065,"createdAt":"2026-05-07T14:22:09.140Z","updatedAt":"2026-05-07T14:25:30.111Z","hash":"00000000000000000001baf5ef058c228e246d9aaa2b9389f36cad5c46d883a2","active":false,"blockNumber":948322,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T14:23:50.993Z","leagueId":22,"multiplier":2,"nftRate":1,"power":55896.33,"winnerClanId":43826,"winnerUserId":4530009,"startedAt":"2026-05-07T14:22:10.905Z","clanWinner":{"clan":{"id":43826,"logo":null,"name":"MineWin","isDeleted":false},"score":1239986.22,"position":3,"btcReward":null,"chanceToWin":12.98,"usedAbilities":[{"count":1,"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1"}]},"userWinner":{"clan":{"id":43826,"logo":null,"name":"MineWin","isDeleted":false},"user":{"id":4530009,"alias":"Cven","avatar":null},"score":1239986.22,"position":2,"gmtReward":null,"chanceToWin":12.98,"usedAbilities":[{"count":1,"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1"}]}},{"id":1027039,"createdAt":"2026-05-07T14:12:21.164Z","updatedAt":"2026-05-07T14:25:29.617Z","hash":"000000000000000000001dc9d1af0e66b1bd6e2306ce9686037c5e2e00aec6e3","active":false,"blockNumber":948321,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T14:22:02.908Z","leagueId":22,"multiplier":1,"nftRate":1,"power":55896.22,"winnerClanId":42388,"winnerUserId":978582,"startedAt":"2026-05-07T14:12:22.781Z","clanWinner":{"clan":{"id":42388,"logo":null,"name":"\ud83d\udc7d EZ 1337 \ud83d\udc7d","isDeleted":false},"score":2237198.250000001,"position":5,"btcReward":null,"chanceToWin":5.33,"usedAbilities":[]},"userWinner":{"clan":{"id":42388,"logo":null,"name":"\ud83d\udc7d EZ 1337 \ud83d\udc7d","isDeleted":false},"user":{"id":978582,"alias":"\ud83d\udc51NIKITOS\ud83d\udc51","avatar":null},"score":37231.82,"position":118,"gmtReward":null,"chanceToWin":0.08,"usedAbilities":[]}},{"id":1027004,"createdAt":"2026-05-07T14:09:27.980Z","updatedAt":"2026-05-07T14:12:25.368Z","hash":"0000000000000000000103fd5f7f7782fc03f75351a36a2049619cb0e14c0f70","active":false,"blockNumber":948320,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T14:12:14.831Z","leagueId":22,"multiplier":4,"nftRate":1,"power":55896.04,"winnerClanId":43743,"winnerUserId":1162580,"startedAt":"2026-05-07T14:09:32.548Z","clanWinner":{"clan":{"id":43743,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/bc1b7a4a-9bf4-424e-bf8c-1576d3b88cef-Carmageddon.png","name":"\u26a1\ud83c\udd8eCARMAGEDON\ud83c\udd8e\u26a1","isDeleted":false},"score":1410280.9000000001,"position":4,"btcReward":null,"chanceToWin":10.63,"usedAbilities":[{"count":1,"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1"}]},"userWinner":{"clan":{"id":43743,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/bc1b7a4a-9bf4-424e-bf8c-1576d3b88cef-Carmageddon.png","name":"\u26a1\ud83c\udd8eCARMAGEDON\ud83c\udd8e\u26a1","isDeleted":false},"user":{"id":1162580,"alias":"Fab89","avatar":null},"score":519477.75,"position":4,"gmtReward":null,"chanceToWin":3.91,"usedAbilities":[{"count":1,"nftGameAbilityId":"5d6f8166-0f20-486f-b920-e898ca94dcc1"}]}},{"id":1026993,"createdAt":"2026-05-07T13:55:02.772Z","updatedAt":"2026-05-07T14:09:25.099Z","hash":"00000000000000000000cc7f8e458ec4aceee1de8fec7bce6b4a971099a2ccdd","active":false,"blockNumber":948319,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T14:09:20.874Z","leagueId":22,"multiplier":1,"nftRate":1,"power":55860.67,"winnerClanId":43501,"winnerUserId":4553052,"startedAt":"2026-05-07T13:55:04.256Z","clanWinner":{"clan":{"id":43501,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/36e289cf-0ae6-430c-afd3-fdbcebfab38d-Futuristic CRYPTOSHARES logo design.png","name":"cryptoshares.club","isDeleted":false},"score":3857046.11,"position":5,"btcReward":null,"chanceToWin":6.02,"usedAbilities":[{"count":1,"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7"}]},"userWinner":{"clan":{"id":43501,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/36e289cf-0ae6-430c-afd3-fdbcebfab38d-Futuristic CRYPTOSHARES logo design.png","name":"cryptoshares.club","isDeleted":false},"user":{"id":4553052,"alias":"A72TEMAS","avatar":null},"score":1495457.53,"position":7,"gmtReward":null,"chanceToWin":2.33,"usedAbilities":[{"count":1,"nftGameAbilityId":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7"}]}},{"id":1026962,"createdAt":"2026-05-07T13:49:50.596Z","updatedAt":"2026-05-07T13:55:09.467Z","hash":"00000000000000000001969364cf8b320a9fe54d11e30636a30b4dca587d6d89","active":false,"blockNumber":948318,"customMultipliers":null,"cycleId":142,"endedAt":"2026-05-07T13:54:56.558Z","leagueId":22,"multiplier":4,"nftRate":1,"power":55834.28,"winnerClanId":33844,"winnerUserId":2895339,"startedAt":"2026-05-07T13:49:52.278Z","clanWinner":{"clan":{"id":33844,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/73f7b593-641b-4965-910b-0724f2236c19-11487292 2.png","name":"GreenSerenity \ud83c\uddf7\ud83c\uddf4\ud83c\udf40","isDeleted":false},"score":701362.6400000016,"position":11,"btcReward":null,"chanceToWin":2.88,"usedAbilities":[]},"userWinner":{"clan":{"id":33844,"logo":"https://storage.googleapis.com/gmt-gendalf-prod/73f7b593-641b-4965-910b-0724f2236c19-11487292 2.png","name":"GreenSerenity \ud83c\uddf7\ud83c\uddf4\ud83c\udf40","isDeleted":false},"user":{"id":2895339,"alias":"\u26a1\ufe0f \ua9c1 \u2620\ufe0fCaP\u2019TaiN \u2620\ufe0f \ua9c2 \u26a1\ufe0f","avatar":"https://storage.googleapis.com/gcs-gmt-bonus-miner-prod/888205ae-8bd3-43f2-950a-4adb35655bb6--big-bg.png"},"score":397133.68,"position":13,"gmtReward":null,"chanceToWin":1.63,"usedAbilities":[]}}],"count":420}}},{"url":"https://api.gomining.com/api/nft-game/league/get-user-positions-data","data":{"data":{"leagueId":22,"clanRank":11,"userRank":1117}}},{"url":"https://api.gomining.com/api/nft-game/league/index","data":{"data":{"array":[{"id":1,"test":false,"name":"odyssey","level":1,"relegationToLeagueId":3,"promotionToLeagueId":null,"totalClansCount":50,"isDynamicClansMovement":false,"roundMultiplierConfig":[{"p":0.659848,"v":1},{"p":0.224475,"v":2},{"p":0.076364,"v":4},{"p":0.025978,"v":8},{"p":0.008837,"v":16},{"p":0.003006,"v":32},{"p":0.001022,"v":64},{"p":0.000347,"v":128},{"p":0.000118,"v":256}]},{"id":3,"test":false,"name":"eclipse","level":2,"relegationToLeagueId":4,"promotionToLeagueId":1,"totalClansCount":49,"isDynamicClansMovement":false,"roundMultiplierConfig":[{"p":0.655774,"v":1},{"p":0.225819,"v":2},{"p":0.077763,"v":4},{"p":0.026778,"v":8},{"p":0.009221,"v":16},{"p":0.003174,"v":32},{"p":0.001095,"v":64},{"p":0.000376,"v":128}]},{"id":4,"test":false,"name":"horizon","level":3,"relegationToLeagueId":5,"promotionToLeagueId":3,"totalClansCount":50,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.648864,"v":1},{"p":0.228118,"v":2},{"p":0.080199,"v":4},{"p":0.028195,"v":8},{"p":0.009914,"v":16},{"p":0.003485,"v":32},{"p":0.001225,"v":64}]},{"id":5,"test":false,"name":"dune-1","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":50,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":6,"test":false,"name":"dune-2","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":54,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":7,"test":false,"name":"dune-3","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":53,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":8,"test":false,"name":"dune-4","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":51,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":9,"test":false,"name":"dune-5","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":51,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":10,"test":false,"name":"dune-6","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":51,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":11,"test":false,"name":"dune-7","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":52,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":12,"test":false,"name":"dune-8","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":51,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":13,"test":false,"name":"dune-9","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":50,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":14,"test":false,"name":"dune-10","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":50,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":15,"test":false,"name":"dune-11","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":55,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":16,"test":false,"name":"dune-12","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":54,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":17,"test":false,"name":"dune-13","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":56,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":18,"test":false,"name":"dune-14","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":58,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":19,"test":false,"name":"dune-15","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":55,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":20,"test":false,"name":"dune-16","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":53,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":21,"test":false,"name":"dune-17","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":56,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":22,"test":false,"name":"dune-18","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":56,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":23,"test":false,"name":"dune-19","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":56,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":24,"test":false,"name":"dune-20","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":56,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":25,"test":false,"name":"dune-21","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":55,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":26,"test":false,"name":"dune-22","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":56,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]},{"id":27,"test":false,"name":"dune-23","level":4,"relegationToLeagueId":null,"promotionToLeagueId":4,"totalClansCount":53,"isDynamicClansMovement":true,"roundMultiplierConfig":[{"p":0.636612,"v":1},{"p":0.232294,"v":2},{"p":0.084762,"v":4},{"p":0.030929,"v":8},{"p":0.011286,"v":16},{"p":0.004117,"v":32}]}]}}},{"url":"https://api.gomining.com/api/nft-game/rewards-by-user","data":{"data":{"type":"clan","count":179,"array":[{"roundId":1025201,"createdAt":"2026-05-07T02:30:35.376Z","startedAt":"2026-05-07T02:30:36.386Z","endedAt":"2026-05-07T02:33:34.392Z","blockNumber":948250,"btcValue":null,"clanId":43340,"cycleId":142,"multiplier":4,"leagueId":22},{"roundId":1025103,"createdAt":"2026-05-07T02:19:37.591Z","startedAt":"2026-05-07T02:19:39.425Z","endedAt":"2026-05-07T02:25:01.276Z","blockNumber":948247,"btcValue":null,"clanId":43340,"cycleId":142,"multiplier":2,"leagueId":22},{"roundId":1024279,"createdAt":"2026-05-06T20:29:52.599Z","startedAt":"2026-05-06T20:29:54.489Z","endedAt":"2026-05-06T20:34:53.618Z","blockNumber":948215,"btcValue":null,"clanId":43340,"cycleId":142,"multiplier":4,"leagueId":22},{"roundId":1023664,"createdAt":"2026-05-06T16:41:31.659Z","startedAt":"2026-05-06T16:41:32.980Z","endedAt":"2026-05-06T16:47:55.694Z","blockNumber":948191,"btcValue":null,"clanId":43340,"cycleId":142,"multiplier":1,"leagueId":22},{"roundId":1022799,"createdAt":"2026-05-06T11:01:32.997Z","startedAt":"2026-05-06T11:01:34.611Z","endedAt":"2026-05-06T11:24:57.026Z","blockNumber":948158,"btcValue":null,"clanId":43340,"cycleId":142,"multiplier":4,"leagueId":22},{"roundId":1022351,"createdAt":"2026-05-06T08:40:01.807Z","startedAt":"2026-05-06T08:40:03.457Z","endedAt":"2026-05-06T08:42:10.763Z","blockNumber":948141,"btcValue":null,"clanId":43340,"cycleId":142,"multiplier":4,"leagueId":22},{"roundId":1021910,"createdAt":"2026-05-06T05:41:27.336Z","startedAt":"2026-05-06T05:41:28.177Z","endedAt":"2026-05-06T05:41:42.591Z","blockNumber":948124,"btcValue":null,"clanId":43340,"cycleId":142,"multiplier":4,"leagueId":22},{"roundId":1018685,"createdAt":"2026-05-05T08:58:10.424Z","startedAt":"2026-05-05T08:58:11.201Z","endedAt":"2026-05-05T09:01:41.041Z","blockNumber":948000,"btcValue":null,"clanId":40216,"cycleId":142,"multiplier":8,"leagueId":11}]}}},{"url":"https://api.gomining.com/api/nft-game/get-total-reward-by-user","data":{"data":{"depositBtc":0.00012112928600000003,"depositGmtFund":0,"depositGmtFundOwner":0}}},{"url":"https://api.gomining.com/api/nft-game/nft-game-bot/index","data":{"data":{"array":[{"id":"168752e7-e296-4eb3-8de4-ea6c7df17ec0","multiplier":16,"active":true,"data":[{"count":1,"abilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4"}]},{"id":"9e0f697a-3a9d-4cd5-a01b-66ee990588f1","multiplier":32,"active":true,"data":[{"count":1,"abilityId":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4"}]}]}}},{"url":"https://api.gomining.com/api/nft-game/nft-game-bot-balance/get-my","data":{"data":{"valueNumeric":"2403604344571869300"}}},{"url":"https://api.gomining.com/api/nft-game/nft-game-user-profile/get-my","data":{"data":{"id":2974235,"createdClansCount":0}}},{"url":"https://api.gomining.com/api/nft-game/nft-game-token/get-balances","data":{"data":{"valueNumeric":0,"freezedValueNumeric":0}}},{"url":"https://api.gomining.com/api/nft-game/nft-game-ability/find-all","data":{"data":{"array":[{"id":"2ec728e7-f31f-4df3-b486-5e82a4976563","createdAt":"2024-09-19T13:39:05.503Z","updatedAt":"2024-09-19T13:39:07.503Z","type":"service","data":{},"name":"Maintenance","description":"Instant boost and service discount","priceInGMT":0,"enabled":true,"subtype":"basic","availableFrom":"2024-09-19T13:39:05.503Z","availableTo":"2124-12-30T23:50:59.999Z","freeUsageCount":0},{"id":"437cdf13-1fda-486b-94f3-7bf0be04ea89","createdAt":"2024-09-19T13:39:06.503Z","updatedAt":"2024-09-19T13:39:07.503Z","type":"boost","data":{"value":1000,"multiply":1},"name":"Boost X1","description":"Boost 1000th","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2024-09-19T13:39:06.503Z","availableTo":"2024-10-14T23:59:59.999Z","freeUsageCount":0},{"id":"5048cf81-9b2e-49d6-b932-389b21534698","createdAt":"2024-09-19T13:39:07.503Z","updatedAt":"2024-09-19T13:39:07.503Z","type":"boost","data":{"value":1000,"multiply":10},"name":"Boost X10","description":"Boost 10000th","priceInGMT":9,"enabled":true,"subtype":"pro","availableFrom":"2024-09-19T13:39:07.503Z","availableTo":"2024-10-14T23:59:59.999Z","freeUsageCount":0},{"id":"88d81f2c-a050-425e-9ef4-3c30239f257b","createdAt":"2024-09-19T13:39:08.503Z","updatedAt":"2024-09-19T13:39:07.503Z","type":"instantBoost","data":{"value":400000,"multiply":1,"activationDelayInSec":3},"name":"Instant Boost","description":"Instant boost 400000 score","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2024-09-19T13:39:08.503Z","availableTo":"2024-10-14T23:59:59.999Z","freeUsageCount":0},{"id":"8a524c3e-e2a3-4990-9edd-658e640d832b","createdAt":"2024-10-14T21:54:57.681Z","updatedAt":"2024-10-14T21:54:57.681Z","type":"boost","data":{"value":1200,"multiply":1},"name":"Boost X1","description":"Boost 1100th","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2024-10-15T00:01:00.000Z","availableTo":"2024-11-04T23:59:59.999Z","freeUsageCount":0},{"id":"d8b09174-6708-4e4d-9ca2-a979a8de8364","createdAt":"2024-10-14T21:56:22.936Z","updatedAt":"2024-10-14T21:56:22.936Z","type":"boost","data":{"value":1200,"multiply":10},"name":"Boost X10","description":"Boost 11000th","priceInGMT":9,"enabled":true,"subtype":"pro","availableFrom":"2024-10-15T00:01:00.000Z","availableTo":"2024-11-04T23:59:59.999Z","freeUsageCount":0},{"id":"44e8af7d-bcfb-4606-a111-5d6ccf1ab463","createdAt":"2024-10-14T21:57:05.377Z","updatedAt":"2024-10-14T21:57:05.377Z","type":"instantBoost","data":{"value":500000,"multiply":1,"activationDelayInSec":3},"name":"Instant Boost","description":"Instant boost 500000 score","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2024-10-15T00:01:00.000Z","availableTo":"2025-02-13T23:59:59.999Z","freeUsageCount":0},{"id":"a1f33226-2b51-4b6e-bbfc-eb0a20f0de1c","createdAt":"2024-11-04T13:53:40.486Z","updatedAt":"2024-11-04T13:53:40.486Z","type":"boost","data":{"value":1500,"multiply":10},"name":"Boost X10","description":"Boost 15000th","priceInGMT":9,"enabled":true,"subtype":"pro","availableFrom":"2024-11-05T00:00:00.000Z","availableTo":"2025-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"ac859dd7-3981-4a10-886b-7c0b03b7a498","createdAt":"2024-11-04T13:53:40.486Z","updatedAt":"2024-11-04T13:53:40.486Z","type":"boost","data":{"value":1500,"multiply":1},"name":"Boost X1","description":"Boost 1500th","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2024-11-05T00:00:00.000Z","availableTo":"2025-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"c6dd94d5-5b35-4764-8ca7-9c2d37995ffa","createdAt":"2025-02-13T21:42:36.421Z","updatedAt":"2025-02-13T21:42:36.421Z","type":"instantBoost","data":{"value":520000,"multiply":1,"activationDelayInSec":3},"name":"Instant Boost","description":"Instant boost 520000 score","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-02-14T00:00:00.000Z","availableTo":"2025-02-14T23:59:59.999Z","freeUsageCount":0},{"id":"b3de5270-4cf6-441d-95e7-ac3d7e33eaee","createdAt":"2025-02-13T21:42:36.421Z","updatedAt":"2025-02-13T21:42:36.421Z","type":"instantBoost","data":{"value":500000,"multiply":1,"activationDelayInSec":3},"name":"Instant Boost","description":"Instant boost 500000 score","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-02-15T00:00:00.000Z","availableTo":"2025-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"8b6fad11-cfc1-4922-ad17-30c41cee39b9","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","type":"instantBoost","data":{"value":400000,"multiply":100,"activationDelayInSec":3},"name":"Instant Boost","description":"Instant boost 40000000 score","priceInGMT":100,"enabled":true,"subtype":"ultra","availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"3f735c47-cead-4d15-8dad-7db4a7b3f4e7","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","type":"boost","data":{"value":1800,"multiply":1},"name":"Boost X1","description":"Boost 1800th","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"17831b5e-afdf-4cb7-98d7-3a60d81e19ae","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","type":"boost","data":{"value":1800,"multiply":10},"name":"Boost X10","description":"Boost 18000th","priceInGMT":10,"enabled":true,"subtype":"pro","availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"e7af0c32-1409-4b22-9e0b-99e7ea4939df","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","type":"boost","data":{"value":1800,"multiply":100},"name":"Boost X100","description":"Boost 180000th","priceInGMT":100,"enabled":true,"subtype":"ultra","availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"370be7b3-d843-4e2f-a23a-eeea37648f99","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","type":"instantBoost","data":{"value":400000,"multiply":1,"activationDelayInSec":3},"name":"Instant Boost","description":"Instant boost 400000 score","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"a7554d7f-0e50-45e0-ab01-6ac8db629bfd","createdAt":"2025-05-22T18:14:53.182Z","updatedAt":"2025-05-22T18:14:53.182Z","type":"instantBoost","data":{"value":400000,"multiply":10,"activationDelayInSec":3},"name":"Instant Boost","description":"Instant boost 4000000 score","priceInGMT":10,"enabled":true,"subtype":"pro","availableFrom":"2025-05-27T00:00:00.000Z","availableTo":"2125-05-27T00:00:00.000Z","freeUsageCount":0},{"id":"646d3c76-fe06-414f-8d39-eb0aa7da429a","createdAt":"2025-06-05T17:18:59.620Z","updatedAt":"2025-06-05T17:18:59.620Z","type":"echoBoost","data":{"value":70000,"multiply":1,"intervalInSec":120},"name":"Echo Boost","description":"Echo boost 100000 score","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-06-10T00:00:00.000Z","availableTo":"2125-06-10T00:00:00.000Z","freeUsageCount":0},{"id":"2ebfd30d-2950-46fc-b3e9-498a924fd021","createdAt":"2025-06-05T17:18:59.620Z","updatedAt":"2025-06-05T17:18:59.620Z","type":"echoBoost","data":{"value":70000,"multiply":10,"intervalInSec":120},"name":"Echo Boost","description":"Echo boost 1000000 score","priceInGMT":10,"enabled":true,"subtype":"pro","availableFrom":"2025-06-10T00:00:00.000Z","availableTo":"2125-06-10T00:00:00.000Z","freeUsageCount":0},{"id":"0ffad19c-8091-4527-a600-b7c2f238147d","createdAt":"2025-06-05T17:18:59.620Z","updatedAt":"2025-06-05T17:18:59.620Z","type":"echoBoost","data":{"value":70000,"multiply":100,"intervalInSec":120},"name":"Echo Boost","description":"Echo boost 10000000 score","priceInGMT":100,"enabled":true,"subtype":"ultra","availableFrom":"2025-06-10T00:00:00.000Z","availableTo":"2125-06-10T00:00:00.000Z","freeUsageCount":0},{"id":"bea03b75-6dbf-4a99-a2c9-24dfe79a3ea1","createdAt":"2025-06-23T09:45:11.437Z","updatedAt":"2025-06-23T09:45:11.437Z","type":"timewrap","data":{"value":1000000,"multiply":100,"durationInSec":300,"activationDelayInSec":3},"name":"Timewrap Boost","description":"Timewrap boost 100000000 score","priceInGMT":100,"enabled":true,"subtype":"ultra","availableFrom":"2025-06-24T00:00:00.000Z","availableTo":"2125-06-24T00:00:00.000Z","freeUsageCount":0},{"id":"592724c5-1f59-43b2-af13-2de8d2c97a9d","createdAt":"2025-06-23T09:45:11.437Z","updatedAt":"2025-06-23T09:45:11.437Z","type":"timewrap","data":{"value":1000000,"multiply":1,"durationInSec":300,"activationDelayInSec":3},"name":"Timewrap Boost","description":"Timewrap boost 1000000 score","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-06-24T00:00:00.000Z","availableTo":"2125-06-24T00:00:00.000Z","freeUsageCount":0},{"id":"a74dd2e0-14a9-46e3-86e5-1f1e8ab1f5c4","createdAt":"2025-06-23T09:45:11.437Z","updatedAt":"2025-06-23T09:45:11.437Z","type":"timewrap","data":{"value":1000000,"multiply":10,"durationInSec":300,"activationDelayInSec":3},"name":"Timewrap Boost","description":"Timewrap boost 10000000 score","priceInGMT":10,"enabled":true,"subtype":"pro","availableFrom":"2025-06-24T00:00:00.000Z","availableTo":"2125-06-24T00:00:00.000Z","freeUsageCount":0},{"id":"5d6f8166-0f20-486f-b920-e898ca94dcc1","createdAt":"2025-07-03T11:35:25.331Z","updatedAt":"2025-07-03T11:35:25.331Z","type":"powerUp","data":{"value":100,"usagePerRound":1,"boostProfitRatio":0.3},"name":"Power Up Boost","description":"Power up boost","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-07-08T00:00:00.000Z","availableTo":"2125-07-08T00:00:00.000Z","freeUsageCount":0},{"id":"8a9b57a9-8a17-4647-8b2f-a164dc52b1f4","createdAt":"2025-07-21T15:15:53.871Z","updatedAt":"2025-07-21T15:15:53.871Z","type":"clanPowerUp","data":{"coefUsageRatios":[{"max":4,"min":1,"coef":1},{"max":9,"min":5,"coef":1.3},{"max":29,"min":10,"coef":1.7},{"max":49,"min":30,"coef":2.2},{"max":99,"min":50,"coef":2.9},{"max":199,"min":100,"coef":3.8},{"max":499,"min":200,"coef":4.9},{"max":null,"min":500,"coef":6.4}],"boostProfitRatio":0,"usagePerRoundByClan":1000,"usagePerRoundByUser":1},"name":"Clan Power Up Boost","description":"Clan Power up boost","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-07-22T00:00:00.000Z","availableTo":"2125-07-22T00:00:00.000Z","freeUsageCount":0},{"id":"53f62dff-30a1-4489-98eb-e7603fab8b74","createdAt":"2025-08-04T13:43:12.751Z","updatedAt":"2025-08-04T13:43:12.751Z","type":"stealer","data":{"copyEffectRatio":0.2},"name":"Stealer","description":"Stealer","priceInGMT":1,"enabled":true,"subtype":"basic","availableFrom":"2025-08-05T00:00:00.000Z","availableTo":"2025-08-07T14:44:00.873Z","freeUsageCount":0},{"id":"b3769e7b-5118-432c-8a13-3e2dc352254d","createdAt":"2025-08-04T13:43:12.751Z","updatedAt":"2025-08-04T13:43:12.751Z","type":"stealer","data":{"copyEffectRatio":1},"name":"Stealer","description":"Stealer","priceInGMT":5,"enabled":true,"subtype":"ultra","availableFrom":"2025-08-05T00:00:00.000Z","availableTo":"2025-08-07T14:44:00.873Z","freeUsageCount":0},{"id":"239502f9-f812-44a7-9331-5335c0639a7c","createdAt":"2025-08-04T13:43:12.751Z","updatedAt":"2025-08-04T13:43:12.751Z","type":"stealer","data":{"copyEffectRatio":0.4},"name":"Stealer","description":"Stealer","priceInGMT":2,"enabled":true,"subtype":"pro","availableFrom":"2025-08-05T00:00:00.000Z","availableTo":"2025-08-07T14:44:00.873Z","freeUsageCount":0}]}}},{"url":"https://api.gomining.com/api/nft-game/nft-game-income/find-aggregated-by-date","data":{"data":{"array":[{"id":1967,"createdAt":"2026-05-05T01:38:47.826Z","totalReward":3.641e-05,"c1Value":0.00014195,"c2Value":5.309e-05,"c3Value":0,"c4Value":0,"c1ValueInBtc":0.00014195,"c1ValueInGmt":0,"c2ValueInBtc":5.309e-05,"c2ValueInGmt":0,"bonusForClanAuthor":null,"insurance":0,"nftsCount":2,"energyEfficiencyDecreaseValue":0,"status":"exported","power":10.262,"energyEfficiency":15,"toAddress":"V022974235842296","toWalletType":"VIRTUAL_GMT","incomeStatistic":{"id":1967,"createdAt":"2026-05-05T01:38:47.826Z","updatedAt":"2026-05-05T17:26:02.681Z","calculatedAt":"2026-05-04T23:59:59.999Z","hash":"975e6977-bf28-4695-b2d5-3c69d5f94603","exported":true,"transactionId":null,"btcCourseInUsd":80234.67157264453,"incomePerTh":4.7e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.2989,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.1993703257694376,"reinvestmentStatus":"sent"},"reinvestment":false,"maintenanceByGmt":false,"maintenanceByGmtUnavailable":true,"rewardProtection":false,"metaData":{"rawValue":5.11024e-07,"maintenanceInBtc":3.3119014341948035e-06,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0.9235456674473068,"balanceGmt":-9.43689570931383e-15,"totalMaintenanceBeforeTokenDiscount":0.8774607386416862,"lockedGmt":116.36}},"reinvestmentInPowerNftId":null,"reinvestmentInPowerNftStatusExecuted":false,"discountByMaintenanceInGmt":0,"totalDiscount":0.039},{"id":1960,"createdAt":"2026-04-28T01:35:44.032Z","totalReward":2.302e-05,"c1Value":5.552e-05,"c2Value":2.402e-05,"c3Value":0,"c4Value":0,"c1ValueInBtc":5.369e-05,"c1ValueInGmt":0.47382586,"c2ValueInBtc":2.313e-05,"c2ValueInGmt":0.2289836,"bonusForClanAuthor":null,"insurance":0,"nftsCount":2,"energyEfficiencyDecreaseValue":0,"status":"exported","power":10.1139,"energyEfficiency":15,"toAddress":"V022974235842296","toWalletType":"VIRTUAL_GMT","incomeStatistic":{"id":1960,"createdAt":"2026-04-28T01:35:44.032Z","updatedAt":"2026-04-30T12:13:43.179Z","calculatedAt":"2026-04-27T23:59:59.999Z","hash":"cbcb1c12-f209-45d9-972b-639d18153090","exported":true,"transactionId":"cbcb1c12-f209-45d9-972b-639d18153090","btcCourseInUsd":77157.80793548055,"incomePerTh":4.6e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.2979,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.1947834376810691,"reinvestmentStatus":"sent"},"reinvestment":false,"maintenanceByGmt":true,"maintenanceByGmtUnavailable":true,"rewardProtection":false,"metaData":{"rawValue":3.9177e-08,"maintenanceInBtc":1.8523209624561883e-07,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0.9132726082578045,"balanceGmt":0.03802775104879488,"totalMaintenanceBeforeTokenDiscount":0.8688875594964752,"lockedGmt":116.36}},"reinvestmentInPowerNftId":21319060,"reinvestmentInPowerNftStatusExecuted":true,"discountByMaintenanceInGmt":0.07,"totalDiscount":0.051},{"id":1921,"createdAt":"2026-04-21T01:35:38.343Z","totalReward":1.816e-05,"c1Value":4.561e-05,"c2Value":2.087e-05,"c3Value":0,"c4Value":0,"c1ValueInBtc":4.561e-05,"c1ValueInGmt":0,"c2ValueInBtc":2.087e-05,"c2ValueInGmt":0,"bonusForClanAuthor":null,"insurance":0,"nftsCount":2,"energyEfficiencyDecreaseValue":0,"status":"exported","power":10.1139,"energyEfficiency":15,"toAddress":"V012974235833366","toWalletType":"VIRTUAL_GMT","incomeStatistic":{"id":1921,"createdAt":"2026-04-21T01:35:38.343Z","updatedAt":"2026-04-21T18:23:40.503Z","calculatedAt":"2026-04-20T23:59:59.999Z","hash":"51833e56-ab63-4522-bafd-a84e919e9175","exported":true,"transactionId":null,"btcCourseInUsd":76198.07004708171,"incomePerTh":4.6e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.3016,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.1949406495912999,"reinvestmentStatus":"sent"},"reinvestment":true,"maintenanceByGmt":false,"maintenanceByGmtUnavailable":true,"rewardProtection":false,"metaData":{"rawValue":1.57927e-07,"maintenanceInBtc":6.631300008259262e-07,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0.9020686671087534,"balanceGmt":-3.3306690738754696e-16,"totalMaintenanceBeforeTokenDiscount":0.859039991687666,"lockedGmt":1}},"reinvestmentInPowerNftId":null,"reinvestmentInPowerNftStatusExecuted":false,"discountByMaintenanceInGmt":0,"totalDiscount":0.039},{"id":1914,"createdAt":"2026-04-14T01:35:38.323Z","totalReward":6.88e-06,"c1Value":2.945e-05,"c2Value":1.251e-05,"c3Value":0,"c4Value":0,"c1ValueInBtc":2.945e-05,"c1ValueInGmt":0,"c2ValueInBtc":1.251e-05,"c2ValueInGmt":0,"bonusForClanAuthor":null,"insurance":0,"nftsCount":2,"energyEfficiencyDecreaseValue":0,"status":"exported","power":10.071299999999999,"energyEfficiency":15,"toAddress":"V022974235842296","toWalletType":"VIRTUAL_GMT","incomeStatistic":{"id":1914,"createdAt":"2026-04-14T01:35:38.323Z","updatedAt":"2026-04-14T17:17:01.878Z","calculatedAt":"2026-04-13T23:59:59.999Z","hash":"b419a4c3-45bd-48b6-871b-fb0784ad82c3","exported":true,"transactionId":null,"btcCourseInUsd":74284.85214427608,"incomePerTh":4.5e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.2912,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.18993293418851723,"reinvestmentStatus":"sent"},"reinvestment":false,"maintenanceByGmt":false,"maintenanceByGmtUnavailable":false,"rewardProtection":false,"metaData":{"rawValue":2.2055e-08,"maintenanceInBtc":3.1090303620457954e-07,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0.9303501717032965,"balanceGmt":0.1735239344995665,"totalMaintenanceBeforeTokenDiscount":0.8859724685130492,"lockedGmt":1}},"reinvestmentInPowerNftId":21319060,"reinvestmentInPowerNftStatusExecuted":true,"discountByMaintenanceInGmt":0,"totalDiscount":0.039},{"id":1907,"createdAt":"2026-04-07T09:17:58.150Z","totalReward":7.19e-06,"c1Value":1.941e-05,"c2Value":9.43e-06,"c3Value":0,"c4Value":0,"c1ValueInBtc":1.855e-05,"c1ValueInGmt":0.19656743,"c2ValueInBtc":9e-06,"c2ValueInGmt":0.09719164,"bonusForClanAuthor":null,"insurance":0,"nftsCount":2,"energyEfficiencyDecreaseValue":0,"status":"exported","power":10.0064,"energyEfficiency":15,"toAddress":"V022974235842296","toWalletType":"VIRTUAL_GMT","incomeStatistic":{"id":1907,"createdAt":"2026-04-07T09:17:58.150Z","updatedAt":"2026-04-09T02:09:35.206Z","calculatedAt":"2026-04-06T23:59:59.999Z","hash":"157c0b56-8c48-4e64-b066-3fd1c4eba1d4","exported":true,"transactionId":"157c0b56-8c48-4e64-b066-3fd1c4eba1d4","btcCourseInUsd":69107.11004691811,"incomePerTh":4.5e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.3015,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.1900489409218959,"reinvestmentStatus":"sent"},"reinvestment":false,"maintenanceByGmt":true,"maintenanceByGmtUnavailable":true,"rewardProtection":false,"metaData":{"rawValue":4.19529e-07,"maintenanceInBtc":3.7703728561708217e-06,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0.892776650082919,"balanceGmt":0.1735239344995665,"totalMaintenanceBeforeTokenDiscount":0.8501912038739637,"lockedGmt":1}},"reinvestmentInPowerNftId":21319060,"reinvestmentInPowerNftStatusExecuted":true,"discountByMaintenanceInGmt":0,"totalDiscount":0.039},{"id":1899,"createdAt":"2026-03-31T01:40:34.141Z","totalReward":6.72e-06,"c1Value":3.264e-05,"c2Value":1.469e-05,"c3Value":0,"c4Value":0,"c1ValueInBtc":3.264e-05,"c1ValueInGmt":0,"c2ValueInBtc":1.469e-05,"c2ValueInGmt":0,"bonusForClanAuthor":null,"insurance":0,"nftsCount":2,"energyEfficiencyDecreaseValue":0,"status":"exported","power":10.0064,"energyEfficiency":15,"toAddress":"V012974235833366","toWalletType":"VIRTUAL_GMT","incomeStatistic":{"id":1899,"createdAt":"2026-03-31T01:40:34.141Z","updatedAt":"2026-03-31T12:53:47.319Z","calculatedAt":"2026-03-30T23:59:59.999Z","hash":"663dffac-4b18-4131-9369-12c08b1b76ab","exported":true,"transactionId":null,"btcCourseInUsd":68180.69649958849,"incomePerTh":4.7e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.3078,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.19746287111969343,"reinvestmentStatus":"sent"},"reinvestment":true,"maintenanceByGmt":false,"maintenanceByGmtUnavailable":true,"rewardProtection":false,"metaData":{"rawValue":8.595e-08,"maintenanceInBtc":1.2282027805482462e-06,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0.8745034437946718,"balanceGmt":0.002907769597635834,"totalMaintenanceBeforeTokenDiscount":0.8338390336582195,"lockedGmt":0}},"reinvestmentInPowerNftId":null,"reinvestmentInPowerNftStatusExecuted":false,"discountByMaintenanceInGmt":0,"totalDiscount":0.036},{"id":1892,"createdAt":"2026-03-24T01:36:49.894Z","totalReward":7e-08,"c1Value":4e-08,"c2Value":2e-08,"c3Value":0,"c4Value":0,"c1ValueInBtc":0,"c1ValueInGmt":0.01030341,"c2ValueInBtc":0,"c2ValueInGmt":0.00509413,"bonusForClanAuthor":null,"insurance":0,"nftsCount":1,"energyEfficiencyDecreaseValue":0,"status":"exported","power":1,"energyEfficiency":15,"toAddress":"V012974235833366","toWalletType":"VIRTUAL_GMT","incomeStatistic":{"id":1892,"createdAt":"2026-03-24T01:36:49.894Z","updatedAt":"2026-03-24T20:00:30.600Z","calculatedAt":"2026-03-23T23:59:59.999Z","hash":"1ea12ebc-697c-4aef-bcbf-0ab9a8c76d79","exported":true,"transactionId":null,"btcCourseInUsd":70779.31227008122,"incomePerTh":4.6e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.3012,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.19726227011834851,"reinvestmentStatus":"sent"},"reinvestment":true,"maintenanceByGmt":true,"maintenanceByGmtUnavailable":false,"rewardProtection":false,"metaData":{"rawValue":3.1092e-08,"maintenanceInBtc":2.615325546721977e-08,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0.08930942895086323,"balanceGmt":0.9907475212563129,"totalMaintenanceBeforeTokenDiscount":0.08746072377158036,"lockedGmt":0}},"reinvestmentInPowerNftId":null,"reinvestmentInPowerNftStatusExecuted":false,"discountByMaintenanceInGmt":0,"totalDiscount":0.012},{"id":1161,"createdAt":"2025-01-07T03:43:16.906Z","totalReward":1.001e-05,"c1Value":9.32e-06,"c2Value":3.45e-06,"c3Value":0,"c4Value":0,"c1ValueInBtc":9.32e-06,"c1ValueInGmt":0,"c2ValueInBtc":3.45e-06,"c2ValueInGmt":0,"bonusForClanAuthor":null,"insurance":0,"nftsCount":1,"energyEfficiencyDecreaseValue":0,"status":"saveToBalance","power":16,"energyEfficiency":20,"toAddress":"14yBWLThHGBG71rjTdt2CQ14HbiyWqXkRz","toWalletType":"BTC","incomeStatistic":{"id":1161,"createdAt":"2025-01-07T03:43:16.906Z","updatedAt":"2025-01-08T02:26:34.581Z","calculatedAt":"2025-01-06T23:59:59.999Z","hash":"13dbcea1-cecb-4de7-8fc1-c654106944ad","exported":true,"transactionId":"dd808c9b57d864269068862a8d22a20283195cf4c28ed2c547c09cab8a852575","btcCourseInUsd":101735.77984161925,"incomePerTh":5.7e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.4966,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.2429310486112506,"reinvestmentStatus":"sent"},"reinvestment":false,"maintenanceByGmt":false,"maintenanceByGmtUnavailable":false,"rewardProtection":false,"metaData":{"rawValue":6.9393e-08,"maintenanceInBtc":8.853834149869715e-08,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0,"balanceGmt":0,"totalMaintenanceBeforeTokenDiscount":0,"lockedGmt":0}},"reinvestmentInPowerNftId":null,"reinvestmentInPowerNftStatusExecuted":false,"discountByMaintenanceInGmt":0,"totalDiscount":0.009},{"id":1154,"createdAt":"2024-12-31T03:46:37.750Z","totalReward":1.262e-05,"c1Value":1.412e-05,"c2Value":5.23e-06,"c3Value":0,"c4Value":0,"c1ValueInBtc":1.412e-05,"c1ValueInGmt":0,"c2ValueInBtc":5.23e-06,"c2ValueInGmt":0,"bonusForClanAuthor":null,"insurance":0,"nftsCount":1,"energyEfficiencyDecreaseValue":0,"status":"saveToBalance","power":16,"energyEfficiency":20,"toAddress":"14yBWLThHGBG71rjTdt2CQ14HbiyWqXkRz","toWalletType":"BTC","incomeStatistic":{"id":1154,"createdAt":"2024-12-31T03:46:37.750Z","updatedAt":"2025-01-01T01:05:27.829Z","calculatedAt":"2024-12-30T23:59:59.999Z","hash":"8649c740-8c92-4388-a271-a42847f74ac2","exported":true,"transactionId":"060f080af00b40ce1f3206c9d6979cb86ab3f18dfe4afc0ac9bbe2b4af97c719","btcCourseInUsd":92299.60483116386,"incomePerTh":5.7e-07,"incomePerThMultiplier":0,"insurance":0,"gmtPrice":0.4786,"kilowattHour":0.05,"insurancePerTh":0,"minIncomePerTh":0,"totalIncome":0.2424733590179802,"reinvestmentStatus":"sent"},"reinvestment":false,"maintenanceByGmt":false,"maintenanceByGmtUnavailable":false,"rewardProtection":false,"metaData":{"rawValue":2.0599e-08,"maintenanceInBtc":3.15875037559035e-08,"dataForGmtMaintenance":{"maintenanceInGmtWithoutDiscount":0,"balanceGmt":0,"totalMaintenanceBeforeTokenDiscount":0,"lockedGmt":0}},"reinvestmentInPowerNftId":null,"reinvestmentInPowerNftStatusExecuted":false,"discountByMaintenanceInGmt":0,"totalDiscount":0.015}],"totalIncome":0.00012112,"count":9}}},{"url":"https://api.gomining.com/api/nft-game/nft-game-income/get-total","data":{"data":{"total":0.00012113,"today":0}}},{"url":"https://api.gomining.com/api/exchanges/getPrice?symbol=BTC&value=1","data":{"data":79855.44776187424}},{"url":"https://api.gomining.com/api/exchanges/getTokenPrice","data":{"data":{"internalGmtRateDiffPercentage":2,"value":0.3078}}},{"url":"https://api.gomining.com/api/home-page/get-info-v2","data":{"data":{"lastNftIncomeInBtc":0,"lastNftGameIncomeInBtc":3.642e-05,"lastNftGameIncomeInGmt":0,"lastNftRewardProtection":false,"lastNftGameRewardProtection":false,"lastHasNftIncome":false,"lastHasNftGameIncome":true,"lastNftIncomeReinvestInGmt":0,"lastNftIncomeReinvestInTh":0,"lastNftGameIncomeReinvestInGmt":0,"lastNftGameIncomeReinvestInTh":0,"lastSimpleEarnIncomeInBtc":0,"previousNftIncomeInBtc":0,"previousNftGameIncomeInBtc":2.302e-05,"previousNftGameIncomeInGmt":0,"previousNftRewardProtection":false,"previousNftGameRewardProtection":false,"previousHasNftIncome":false,"previousHasNftGameIncome":true,"previousNftIncomeReinvestInGmt":0,"previousNftIncomeReinvestInTh":0,"previousNftGameIncomeReinvestInGmt":0,"previousNftGameIncomeReinvestInTh":0.1481,"previousSimpleEarnIncomeInBtc":0,"currentGmtPrice":0.3078,"currentBtcPrice":79900.071248318,"previousGmtPrice":0.3053,"previousBtcPrice":81310.04251067}}},{"url":"https://api.gomining.com/api/action/get-maintenance-state","data":{"data":{"userId":2974235,"name":"maintenance","value":10,"lastUpdatedAt":"2026-05-07T04:32:24.214Z","updateAvailableFrom":"2026-05-08T00:00:00.000Z"}}}]</script>
+<script>
+/* ============================================================
+   MWsample.js — parser + math, 100% self-contained
+   ============================================================ */
+
+const $ = sel => document.querySelector(sel);
+
+// === Provenance helper ===
+function tag(value, src, path, conf){
+  if (value === null || value === undefined) return null;
+  return { value, sourceEndpoint: src||null, sourcePath: path||null, capturedAt: Date.now(), confidence: conf||'medium' };
+}
+function v(x){ return (x && typeof x==='object' && 'value' in x) ? x.value : x; }
+
+// === Parser: takes [{url, data},...] returns normalized live.* shape ===
+function parseEndpoints(captures){
+  const out = {
+    user: {}, clan: {}, league: {}, round: {}, rewards: {}, boosts: {},
+    serviceState: {}, prices: {},
+    sources: {}, capturedAt: Date.now(),
+    leagueCatalog: [],
+  };
+  for (const cap of captures){
+    const url = cap.url || '';
+    const d   = cap.data;
+    if (!d) continue;
+
+    // /api/nft-game/league/index — full league catalog
+    if (/\/nft-game\/league\/index/i.test(url) && d.data && Array.isArray(d.data.array)){
+      out.sources.leagueIndex = url;
+      out.leagueCatalog = d.data.array.map(L => ({
+        id:L.id, name:L.name, level:L.level,
+        totalClansCount:L.totalClansCount,
+        promotionToLeagueId:L.promotionToLeagueId,
+        relegationToLeagueId:L.relegationToLeagueId,
+        isDynamicClansMovement:L.isDynamicClansMovement,
+        roundMultiplierConfig: L.roundMultiplierConfig||[],
+      }));
+    }
+
+    // /api/nft-game/league/get-user-positions-data — ranks
+    if (/\/nft-game\/league\/get-user-positions-data/i.test(url) && d.data){
+      out.sources.positions = url;
+      const k = d.data;
+      if (k.leagueId !== undefined) out.league.leagueId = tag(k.leagueId, url, 'data.leagueId', 'high');
+      if (k.clanRank !== undefined) out.clan.rank        = tag(k.clanRank, url, 'data.clanRank', 'high');
+      if (k.userRank !== undefined) out.user.rank        = tag(k.userRank, url, 'data.userRank', 'high');
+    }
+
+    // /api/nft-game/clan-leaderboard/index-v2 — league fund + total power + avg W/TH
+    if (/\/nft-game\/clan-leaderboard\/index-v2/i.test(url) && d.data){
+      out.sources.leaderboard = url;
+      const L = d.data;
+      if (L.btcFund !== undefined)
+        out.league.btcRewardFund = tag(Number(L.btcFund), url, 'data.btcFund', 'high');
+      if (L.totalPower !== undefined)
+        out.league.totalPowerTh = tag(L.totalPower, url, 'data.totalPower', 'high');
+      if (L.weightedEnergyEfficiencyPerTh !== undefined)
+        out.league.averageWPerTh = tag(L.weightedEnergyEfficiencyPerTh, url, 'data.weightedEnergyEfficiencyPerTh', 'high');
+      if (L.totalMinedBlocks !== undefined) out.league.totalMinedBlocks = tag(L.totalMinedBlocks, url, 'data.totalMinedBlocks', 'high');
+      if (L.count !== undefined)            out.league.clanCount        = tag(L.count, url, 'data.count', 'high');
+      if (L.status)                         out.league.status           = tag(L.status, url, 'data.status', 'high');
+      if (L.me){ if (L.me.id !== undefined) out.clan.clanId = tag(L.me.id, url, 'data.me.id','high'); if (L.me.name) out.clan.name = tag(L.me.name, url, 'data.me.name','high'); }
+      if (Array.isArray(L.clansPromoted))   out.league.clansPromoted   = tag(L.clansPromoted,  url, 'data.clansPromoted',  'high');
+      if (Array.isArray(L.clansRemaining))  out.league.clansRemaining  = tag(L.clansRemaining, url, 'data.clansRemaining', 'high');
+      if (Array.isArray(L.clansRelegated))  out.league.clansRelegated  = tag(L.clansRelegated, url, 'data.clansRelegated', 'high');
+    }
+
+    // /api/nft-game/clan/get-by-id — clan + your profile
+    if (/\/nft-game\/clan\/get-by-id/i.test(url) && d.data){
+      out.sources.clanDetail = url;
+      const C = d.data;
+      if (C.id !== undefined)         out.clan.clanId       = out.clan.clanId   || tag(C.id, url, 'data.id', 'high');
+      if (C.name)                     out.clan.name         = out.clan.name     || tag(C.name, url, 'data.name', 'high');
+      if (C.leagueId !== undefined)   out.clan.leagueId     = tag(C.leagueId, url, 'data.leagueId', 'high');
+      if (C.usersCount !== undefined) out.clan.usersCount   = tag(C.usersCount, url, 'data.usersCount', 'high');
+      if (C.nftsCount !== undefined)  out.clan.nftsCount    = tag(C.nftsCount, url, 'data.nftsCount', 'high');
+      if (C.power !== undefined)      out.clan.totalBaseTh  = tag(C.power, url, 'data.power', 'high');
+      if (C.weightedEffectiveness !== undefined) out.clan.weightedEffectiveness = tag(C.weightedEffectiveness, url, 'data.weightedEffectiveness', 'high');
+      if (C.blocksMined !== undefined)           out.clan.blocksMined           = tag(C.blocksMined, url, 'data.blocksMined (ALL-TIME, since clan creation)', 'high');
+      if (C.createdAt)                           out.clan.createdAt             = tag(C.createdAt, url, 'data.createdAt', 'high');
+      if (C.blocksShare !== undefined)           out.clan.blocksSharePctAllTime = tag(C.blocksShare, url, 'data.blocksShare (ALL-TIME ratio)', 'high');
+      if (C.btcIncome !== undefined)             out.clan.btcIncome             = tag(C.btcIncome, url, 'data.btcIncome', 'high');
+      if (C.gmtIncome !== undefined)             out.clan.gmtIncome             = tag(C.gmtIncome, url, 'data.gmtIncome', 'high');
+      if (C.powerShare !== undefined)            out.clan.powerSharePct         = tag(C.powerShare, url, 'data.powerShare', 'high');
+      if (C.scoreShare !== undefined)            out.clan.scoreSharePct         = tag(C.scoreShare, url, 'data.scoreShare', 'high');
+      if (C.luck !== undefined)                  out.clan.luck                  = tag(C.luck, url, 'data.luck', 'high');
+      if (C.clanRank !== undefined && !out.clan.rank) out.clan.rank = tag(C.clanRank, url, 'data.clanRank', 'high');
+      if (C.myProfile){
+        const M = C.myProfile;
+        if (M.id !== undefined)      out.user.userId      = tag(M.id, url, 'data.myProfile.id', 'high');
+        if (M.alias)                 out.user.alias       = tag(M.alias, url, 'data.myProfile.alias', 'high');
+        if (M.power !== undefined)   out.user.baseTh      = tag(M.power, url, 'data.myProfile.power', 'high');
+        if (M.ee !== undefined)      out.user.wPerTh      = tag(M.ee, url, 'data.myProfile.ee', 'high');
+        if (M.isOwner !== undefined) out.user.isClanOwner = tag(M.isOwner, url, 'data.myProfile.isOwner', 'high');
+        if (M.joinDate)              out.user.joinDate    = tag(M.joinDate, url, 'data.myProfile.joinDate', 'high');
+        if (Array.isArray(M.usedNftGameAbilities)) out.boosts.usedAbilitiesByUser = tag(M.usedNftGameAbilities, url, 'data.myProfile.usedNftGameAbilities', 'high');
+        if (M.power && C.power) out.clan.userClanShare = tag(M.power / C.power, url, 'myProfile.power/data.power', 'high');
+      }
+      if (Array.isArray(C.usersForClient)) out.clan.members = tag(C.usersForClient, url, 'data.usersForClient', 'high');
+    }
+
+    // /api/nft-game/round/get-state — live round
+    if (/\/nft-game\/round\/get-state/i.test(url) && d.data){
+      out.sources.roundState = url;
+      const R = d.data;
+      if (R.type)                 out.round.type      = tag(R.type, url, 'data.type', 'high');
+      if (R.count !== undefined)  out.round.clanCount = tag(R.count, url, 'data.count', 'high');
+      if (R.me){
+        const me = R.me;
+        out.round.myClanRound = tag({
+          rank: me.rank, winChance: me.chance, power: me.power,
+          basePoints: me.basePoints, currentAddedScore: me.currentAddedScore,
+          activeBoostScore: me.activeBoostScore, score: me.score,
+          usedAbilities: me.usedAbilities||[], clanName: me.clanName,
+        }, url, 'data.me', 'high');
+      }
+      if (Array.isArray(R.array)) out.round.clanRows = tag(R.array, url, 'data.array', 'high');
+    }
+
+    // /api/nft-game/rewards-by-user
+    if (/\/nft-game\/rewards-by-user/i.test(url) && d.data && Array.isArray(d.data.array)){
+      out.sources.rewardsByUser = url;
+      const items = d.data.array;
+      const existing = (out.rewards.clanRewardsItems && out.rewards.clanRewardsItems.value) || [];
+      const byKey = new Map();
+      for (const it of existing) byKey.set(it.roundId ?? JSON.stringify(it), it);
+      for (const it of items)    byKey.set(it.roundId ?? JSON.stringify(it), it);
+      const merged = Array.from(byKey.values()).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      out.rewards.clanRewardsItems = tag(merged, url, 'data.array', 'high');
+      out.rewards.clanRewardsCount = tag(d.data.count, url, 'data.count', 'high');
+      if (merged.length){
+        const cycles = merged.map(r=>r.cycleId).filter(c=>c!=null).sort((a,b)=>b-a);
+        const latestCycle = cycles[0];
+        const totalCount = d.data.count; // server total — what we'd see if fully paginated
+        const rowsLoaded = merged.length;
+        const isPartial = totalCount && rowsLoaded < totalCount;
+        if (latestCycle !== undefined){
+          const rows = merged.filter(r=>r.cycleId===latestCycle);
+          const btc  = rows.reduce((s,r)=>s+(Number(r.btcValue)||0), 0);
+          out.rewards.currentCycleId           = tag(latestCycle, url, 'max(cycleId)', 'high');
+          out.rewards.currentCycleClanRounds   = tag(rows.length, url,
+            `count(cycleId==max) — PARTIAL (loaded ${rowsLoaded}/${totalCount||'?'} rows)`,
+            isPartial ? 'low' : 'high');
+          out.rewards.currentCycleClanBtcTotal = tag(btc, url,
+            `sum(btcValue) where cycleId==max — PARTIAL (${rowsLoaded}/${totalCount||'?'})`,
+            isPartial ? 'low' : 'medium');
+          out.rewards.rewardsPaginationStatus  = tag({loaded:rowsLoaded, total:totalCount, partial:isPartial},
+            url, 'data.array.length / data.count', 'high');
+        }
+      }
+    }
+
+    // /api/nft-game/get-total-reward-by-user
+    if (/\/nft-game\/get-total-reward-by-user/i.test(url) && d.data){
+      out.sources.totalRewards = url;
+      const T = d.data;
+      if (T.depositBtc !== undefined)          out.rewards.totalDepositBtc          = tag(T.depositBtc, url, 'data.depositBtc', 'high');
+      if (T.depositGmtFund !== undefined)      out.rewards.totalDepositGmtFund      = tag(T.depositGmtFund, url, 'data.depositGmtFund', 'medium');
+      if (T.depositGmtFundOwner !== undefined) out.rewards.totalDepositGmtFundOwner = tag(T.depositGmtFundOwner, url, 'data.depositGmtFundOwner', 'medium');
+    }
+
+    // /api/nft-game/nft-game-bot/index — bot rules
+    if (/\/nft-game\/nft-game-bot\/index/i.test(url) && d.data && Array.isArray(d.data.array)){
+      out.sources.botConfig = url;
+      out.boosts.botRules = tag(d.data.array, url, 'data.array', 'high');
+    }
+
+    // /api/nft-game/nft-game-bot-balance/get-my
+    if (/\/nft-game\/nft-game-bot-balance\/get-my/i.test(url) && d.data && d.data.valueNumeric !== undefined){
+      out.sources.botBalance = url;
+      out.boosts.botBalanceRaw = tag(d.data.valueNumeric, url, 'data.valueNumeric', 'high');
+      out.boosts.botBalanceGmt = tag(Number(d.data.valueNumeric)/1e18, url, 'data.valueNumeric / 1e18', 'high');
+    }
+
+    // /api/exchanges/getPrice — generic coin price endpoint
+    // GoMining calls this for BTC, ETH, BNB, SOL, TON, etc. We MUST filter
+    // strictly by ?symbol=BTC — otherwise we'd accept the last call (could be TON $2).
+    if (/\/exchanges\/getPrice/i.test(url) && d.data !== undefined && typeof d.data === 'number'){
+      if (/[?&]symbol=BTC(\b|&|$)/i.test(url)){
+        out.sources.prices = url;
+        out.prices.btcUsd = tag(d.data, url, 'data', 'high');
+      }
+    }
+
+    // /api/action/get-maintenance-state
+    if (/\/action\/get-maintenance-state/i.test(url) && d.data){
+      out.sources.maintenanceState = url;
+      const S = d.data;
+      if (S.userId !== undefined)          out.user.userId            = out.user.userId || tag(S.userId, url, 'data.userId', 'high');
+      if (S.name)                          out.serviceState.name      = tag(S.name, url, 'data.name', 'high');
+      if (S.value !== undefined)           out.serviceState.value     = tag(S.value, url, 'data.value', 'high');
+      if (S.lastUpdatedAt)                 out.serviceState.lastUpdatedAt = tag(S.lastUpdatedAt, url, 'data.lastUpdatedAt', 'high');
+      if (S.updateAvailableFrom)           out.serviceState.updateAvailableFrom = tag(S.updateAvailableFrom, url, 'data.updateAvailableFrom', 'high');
+    }
+
+    // ===== NEW endpoints from fresh HAR =====
+
+    // /api/nft-game/clan/get-my — your own clan summary (lighter than get-by-id, includes ALL members)
+    // NOTE: clan/get-by-id returns ACTIVE-eligible TH; clan/get-my returns total roster TH.
+    // We prefer get-by-id for math but fall back to get-my for name/logo/description.
+    if (/\/nft-game\/clan\/get-my/i.test(url) && d.data){
+      out.sources.clanMy = url;
+      const C = d.data;
+      if (!out.clan.clanId && C.id !== undefined)     out.clan.clanId     = tag(C.id, url, 'data.id', 'high');
+      if (!out.clan.name && C.name)                    out.clan.name       = tag(C.name, url, 'data.name', 'high');
+      if (!out.clan.usersCount && C.usersCount !== undefined) out.clan.usersCount = tag(C.usersCount, url, 'data.usersCount', 'high');
+      if (C.nftsCount !== undefined && (!out.clan.nftsCount || v(out.clan.nftsCount) < C.nftsCount))
+        out.clan.nftsCount  = tag(C.nftsCount, url, 'data.nftsCount', 'high');
+      if (C.power !== undefined) out.clan.totalRosterTh = tag(C.power, url, 'data.power (incl. inactive)', 'high');
+      if (!out.clan.leagueId && C.leagueId !== undefined) out.clan.leagueId = tag(C.leagueId, url, 'data.leagueId', 'high');
+      if (C.logo) out.clan.logo = tag(C.logo, url, 'data.logo', 'high');
+      if (C.description) out.clan.description = tag(C.description, url, 'data.description', 'high');
+    }
+
+    // /api/nft-game/round/get-last — most recent finished round (for cycle history)
+    if (/\/nft-game\/round\/get-last/i.test(url) && d.data){
+      out.sources.roundLast = url;
+      const R = d.data;
+      out.round.lastRound = tag({
+        id: R.id, blockNumber: R.blockNumber, leagueId: R.leagueId,
+        cycleId: R.cycleId, multiplier: R.multiplier, active: R.active,
+        startedAt: R.startedAt, endedAt: R.endedAt,
+        winnerClanId: R.winnerClanId, winnerUserId: R.winnerUserId,
+      }, url, 'data', 'high');
+    }
+
+    // /api/nft-game/round/find-by-cycleId — full list of rounds in current cycle
+    if (/\/nft-game\/round\/find-by-cycleId/i.test(url) && d.data && Array.isArray(d.data.array)){
+      out.sources.cycleRounds = url;
+      const arr = d.data.array;
+      out.round.cycleRounds = tag(arr, url, 'data.array', 'high');
+      // Compute cycle stats: total rounds, your-clan wins, multipliers played
+      const myClanId = v(out.clan.clanId);
+      let yourClanWins = 0, totalDecided = 0;
+      const multHist = {};
+      for (const r of arr){
+        if (r.winnerClanId !== null && r.winnerClanId !== undefined){
+          totalDecided++;
+          if (myClanId && r.winnerClanId === myClanId) yourClanWins++;
+        }
+        const mk = r.multiplier;
+        if (mk !== undefined) multHist[mk] = (multHist[mk]||0) + 1;
+      }
+      out.round.cycleRoundCount = tag(arr.length, url, 'data.array.length', 'high');
+      out.round.cycleDecidedCount = tag(totalDecided, url, 'count(winnerClanId!=null)', 'high');
+      out.round.cycleYourClanWins = tag(yourClanWins, url, 'count(winnerClanId==myClanId)', 'high');
+      out.round.cycleMultHistogram = tag(multHist, url, 'histogram(data.array.multiplier)', 'high');
+    }
+
+    // /api/nft-game/nft-game-user-profile/get-my — your MW user profile
+    if (/\/nft-game\/nft-game-user-profile\/get-my/i.test(url) && d.data){
+      out.sources.userProfile = url;
+      if (d.data.id !== undefined) out.user.userId = out.user.userId || tag(d.data.id, url, 'data.id', 'high');
+      if (d.data.createdClansCount !== undefined) out.user.createdClansCount = tag(d.data.createdClansCount, url, 'data.createdClansCount', 'high');
+    }
+
+    // /api/nft-game/nft-game-token/get-balances — MW-internal token balances
+    if (/\/nft-game\/nft-game-token\/get-balances/i.test(url) && d.data){
+      out.sources.tokenBalances = url;
+      if (d.data.valueNumeric !== undefined) out.user.mwTokenValueNumeric = tag(d.data.valueNumeric, url, 'data.valueNumeric', 'high');
+      if (d.data.freezedValueNumeric !== undefined) out.user.mwTokenFrozenValueNumeric = tag(d.data.freezedValueNumeric, url, 'data.freezedValueNumeric', 'high');
+    }
+
+    // /api/nft-game/nft-game-ability/find-all — full spell catalog with prices (use as bot rule lookup)
+    if (/\/nft-game\/nft-game-ability\/find-all/i.test(url) && d.data && Array.isArray(d.data.array)){
+      out.sources.abilityCatalog = url;
+      const now = Date.now();
+      const active = d.data.array.filter(a => {
+        if (a.enabled === false) return false;
+        const to = a.availableTo ? Date.parse(a.availableTo) : Infinity;
+        const from = a.availableFrom ? Date.parse(a.availableFrom) : 0;
+        return to > now && from <= now;
+      });
+      out.boosts.abilityCatalog = tag(active, url, 'data.array (active)', 'high');
+    }
+
+    // /api/nft-game/nft-game-income/find-aggregated-by-date — your MW reward history per day
+    if (/\/nft-game\/nft-game-income\/find-aggregated-by-date/i.test(url) && d.data && Array.isArray(d.data.array)){
+      out.sources.mwRewardHistory = url;
+      out.rewards.mwDailyRewards = tag(d.data.array, url, 'data.array', 'high');
+      // Total observed BTC + GMT this period
+      let btcTotal = 0, gmtTotal = 0;
+      for (const r of d.data.array){
+        btcTotal += Number(r.c1ValueInBtc||0) + Number(r.c2ValueInBtc||0);
+        gmtTotal += Number(r.c1ValueInGmt||0) + Number(r.c2ValueInGmt||0);
+      }
+      out.rewards.mwBtcLastNDays = tag(btcTotal, url, 'sum(c1ValueInBtc + c2ValueInBtc)', 'high');
+      out.rewards.mwGmtLastNDays = tag(gmtTotal, url, 'sum(c1ValueInGmt + c2ValueInGmt)', 'high');
+    }
+
+    // /api/nft-game/nft-game-income/get-total — cumulative MW income totals
+    if (/\/nft-game\/nft-game-income\/get-total/i.test(url) && d.data){
+      out.sources.mwTotal = url;
+      if (d.data.total !== undefined) out.rewards.mwTotalIncome = tag(d.data.total, url, 'data.total', 'high');
+      if (d.data.today !== undefined) out.rewards.mwTodayIncome = tag(d.data.today, url, 'data.today', 'high');
+    }
+
+    // /api/exchanges/getTokenPrice — GMT price (different shape than getPrice)
+    if (/\/exchanges\/getTokenPrice/i.test(url) && d.data){
+      out.sources.tokenPrice = url;
+      // Shape: { value: 0.3078, internalGmtRateDiffPercentage: 2 }
+      if (typeof d.data.value === 'number') out.prices.gmtUsd = tag(d.data.value, url, 'data.value', 'high');
+      else if (typeof d.data.price === 'number') out.prices.gmtUsd = tag(d.data.price, url, 'data.price', 'high');
+      else if (typeof d.data === 'number')      out.prices.gmtUsd = tag(d.data, url, 'data', 'high');
+    }
+
+    // /api/home-page/get-info-v2 — multi-purpose home page payload (BTC + GMT prices + last incomes)
+    if (/\/home-page\/get-info-v2/i.test(url) && d.data){
+      out.sources.homePage = url;
+      const H = d.data;
+      if (H.currentBtcPrice && !out.prices.btcUsd) out.prices.btcUsd = tag(H.currentBtcPrice, url, 'data.currentBtcPrice', 'high');
+      if (H.currentGmtPrice && !out.prices.gmtUsd) out.prices.gmtUsd = tag(H.currentGmtPrice, url, 'data.currentGmtPrice', 'high');
+      if (H.lastNftGameIncomeInBtc !== undefined) out.rewards.lastDayMwBtc = tag(H.lastNftGameIncomeInBtc, url, 'data.lastNftGameIncomeInBtc', 'high');
+      if (H.lastNftGameIncomeInGmt !== undefined) out.rewards.lastDayMwGmt = tag(H.lastNftGameIncomeInGmt, url, 'data.lastNftGameIncomeInGmt', 'high');
+    }
+  }
+
+  // Resolve YOUR league from any source, then mirror its catalog row
+  const myLeagueId = v(out.league.leagueId) ?? v(out.clan.leagueId);
+  if (myLeagueId != null && out.leagueCatalog.length){
+    const L = out.leagueCatalog.find(x=>x.id===myLeagueId);
+    if (L){
+      if (L.name)                              out.league.leagueName  = out.league.leagueName  || tag(L.name, out.sources.leagueIndex, 'catalog.name', 'high');
+      if (L.level !== undefined)               out.league.level       = out.league.level       || tag(L.level, out.sources.leagueIndex, 'catalog.level', 'high');
+      if (L.totalClansCount !== undefined)     out.league.totalClansCount = out.league.totalClansCount || tag(L.totalClansCount, out.sources.leagueIndex, 'catalog.totalClansCount', 'high');
+      if (Array.isArray(L.roundMultiplierConfig) && L.roundMultiplierConfig.length){
+        out.league.roundMultiplierConfig = tag(L.roundMultiplierConfig.slice(), out.sources.leagueIndex, 'catalog.roundMultiplierConfig', 'high');
+        out.league.maxMultiplier = tag(L.roundMultiplierConfig.reduce((m,x)=>Math.max(m,x.v||0),0),
+          out.sources.leagueIndex, 'max(catalog.roundMultiplierConfig.v)', 'high');
+      }
+    }
+  }
+  return out;
+}
+
+// === Math: clan share, excess fee, projected gross ===
+function runMath(live, ov){
+  const userTh    = (+ov.th)  || v(live.user.baseTh);
+  const userWth   = (+ov.wth) || v(live.user.wPerTh);
+  const clanTh    = v(live.clan.totalBaseTh);
+  const leagueTh  = v(live.league.totalPowerTh);
+  const leagueAvgWth = v(live.league.averageWPerTh);
+  const fundBtc   = v(live.league.btcRewardFund);
+  const userClanShare = (userTh && clanTh) ? userTh/clanTh : null;
+
+  // Cycle BTC for clan so far + your share
+  const cycleClanBtc = v(live.rewards.currentCycleClanBtcTotal);
+  const yourCycleBtc = (cycleClanBtc != null && userClanShare != null) ? cycleClanBtc * userClanShare : null;
+
+  // Statistical baseline: clanTh / leagueTh × fundBtc per cycle, your share
+  const clanFairBtc = (clanTh && leagueTh && fundBtc) ? (clanTh/leagueTh) * fundBtc : null;
+  const yourFairBtc = (clanFairBtc != null && userClanShare != null) ? clanFairBtc * userClanShare : null;
+
+  // Excess-fee tax: charged on TH above your solo ceiling using LEAGUE avg W/TH
+  // Solo ceiling assumed = userTh × prBtcPerTh (manual override or none)
+  const prBtcDay = +ov.pr || null; // user supplies; null => skip
+  const svc = +ov.svc || 0.0089;
+  const btcUsd = (+ov.btc) || v(live.prices.btcUsd);
+  // Excess fee in USD/day: max(0, leagueAvgWth - userWth) × kWh×24 × elec... too many vars
+  // Simpler: excess fee = (leagueAvgWth × userTh × 24/1000) × elec_rate × 7  - solo fee
+  // We instead show the DELTA in W/TH and let user reason about it.
+  const wthDelta = (leagueAvgWth && userWth) ? (leagueAvgWth - userWth) : null;
+
+  return {
+    userTh, userWth, clanTh, leagueTh, leagueAvgWth, fundBtc,
+    userClanShare, cycleClanBtc, yourCycleBtc,
+    clanFairBtc, yourFairBtc, wthDelta,
+    btcUsd, gmtUsd: (+ov.gmt) || v(live.prices.gmtUsd) || null, prBtcDay, svc,
+  };
+}
+
+/* =================================================================
+   PROJECTION ENGINE — week-end winnings forecast
+   =================================================================
+   Three signals, blended by data quality:
+
+   (a) BASELINE: pure statistical fair share — works with zero history.
+       fairBtcCycle = (yourTh / leagueTh) × leagueBtcFund
+       Confidence = LOW (assumes you hit your statistical share exactly)
+
+   (b) PRIOR CYCLES: average of last N complete cycles for YOUR clan,
+       scaled by your current TH share.
+       priorAvgBtc  = mean( clanCycleBtc[c] for last 3 complete cycles )
+       yourPriorBtc = priorAvgBtc × userClanShare × luckFactor
+       Confidence = MEDIUM/HIGH (depends on N cycles available)
+
+   (c) LIVE: extrapolate THIS cycle's observed performance.
+       elapsedFrac = (now - cycleStart) / 7days
+       observedBtc = sum(rewards-by-user[cycleId=current].btcValue)
+       liveProj   = observedBtc / elapsedFrac × userClanShare
+       Confidence = LOW early (elapsed < 1d) → HIGH late (elapsed > 5d)
+
+   BLEND:
+     α (live weight)     = clamp(elapsedFrac, 0, 0.85)
+     β (prior weight)    = priorCycleCount > 0 ? min(0.5, priorCycleCount/4) : 0
+     γ (baseline weight) = 1 - α - β   (always ≥ 0.15 to keep math grounded)
+
+     projection = α·live + β·prior + γ·baseline
+
+   Then apply excess-fee adjustment (your W/TH vs league avg).
+   ================================================================= */
+function runProjection(live, math, ov, mode){
+  const _v = (x) => (x && typeof x === 'object' && 'value' in x) ? x.value : x;
+  const out = { mode, signals:{}, weights:{}, blended:null, confidence:'low', notes:[] };
+
+  // Resolve inputs (live + overrides)
+  const userTh   = math.userTh;
+  const clanTh   = math.clanTh;
+  const leagueTh = math.leagueTh;
+  const fundBtc  = math.fundBtc;
+  const share    = math.userClanShare;
+  // Luck handling:
+  //  - User-supplied (mp-luck) is a forward-looking multiplier (1 = neutral).
+  //  - clan.luck from API is BACKWARD looking (realized / expected, all-time).
+  //    Don't auto-apply it to baseline — that would double-count past variance
+  //    into a forward forecast. We only apply user-supplied luck.
+  //  - Prior-cycles signal already implicitly captures clan luck (averaged).
+  const userLuck = +ov.luck;
+  const luckFwd  = (userLuck > 0) ? userLuck : 1;
+  const apiLuck  = _v(live.clan?.luck);
+
+  // ----- (a) BASELINE -----
+  if (userTh && leagueTh && fundBtc){
+    const yourBaselineBtcCycle = (userTh / leagueTh) * fundBtc * luckFwd;
+    out.signals.baseline = {
+      btc: yourBaselineBtcCycle,
+      formula: `(userTh / leagueTh) × fundBtc × luckFwd = (${fmt(userTh,2)}/${fmt(leagueTh,0)}) × ${fmt(fundBtc,6)} × ${fmt(luckFwd,2)}`,
+    };
+    if (apiLuck != null) out.notes.push(`info: clan all-time luck = ${fmt(apiLuck,2)} (NOT auto-applied to baseline)`);
+  } else out.notes.push('baseline: missing userTh/leagueTh/fundBtc');
+
+  // ----- (b) PRIOR CYCLES -----
+  // Use rewards-by-user history grouped by cycleId. Skip the CURRENT cycle
+  // (still in progress). Compute mean BTC per cycle for clan, then scale by
+  // YOUR share. This requires the user to have paginated through history;
+  // we use whatever rows were captured.
+  const rewards = _v(live.rewards?.clanRewardsItems);
+  const currentCycle = _v(live.rewards?.currentCycleId);
+  if (Array.isArray(rewards) && rewards.length){
+    const byCycle = {};
+    for (const r of rewards){
+      const cid = r.cycleId;
+      if (cid == null || cid === currentCycle) continue; // skip current
+      const btc = Number(r.btcValue) || 0;
+      byCycle[cid] = (byCycle[cid] || 0) + btc;
+    }
+    const cycleIds = Object.keys(byCycle).map(Number).sort((a,b)=>b-a);
+    const lastN = cycleIds.slice(0, 3); // last 3 complete cycles
+    if (lastN.length && share != null){
+      const cycleBtcs = lastN.map(c => byCycle[c]);
+      const meanClanBtc = cycleBtcs.reduce((s,x)=>s+x, 0) / cycleBtcs.length;
+      const yourPriorBtc = meanClanBtc * share * luckFwd;
+      out.signals.prior = {
+        btc: yourPriorBtc,
+        clanMean: meanClanBtc,
+        cyclesUsed: lastN.length,
+        breakdown: lastN.map((c,i)=>`cycle ${c}: ${fmt(cycleBtcs[i],6)} BTC`).join(', '),
+        formula: `mean(${cycleBtcs.map(x=>fmt(x,6)).join(', ')}) × share=${fmt(share,4)} × luckFwd=${fmt(luckFwd,2)} = ${fmt(yourPriorBtc,6)} BTC`,
+      };
+    } else if (lastN.length === 0) {
+      out.notes.push('prior: no complete cycles in history (need to paginate rewards-by-user further back)');
+    }
+  } else out.notes.push('prior: rewards-by-user not loaded');
+
+  // ----- (c) LIVE / EXTRAPOLATE THIS CYCLE -----
+  // We need elapsedFrac. If we have round/find-by-cycleId we can use the oldest
+  // round's startedAt. Otherwise fall back to manual override or assume 50%.
+  let elapsedFrac = +ov.elapsed ? (+ov.elapsed / 7) : null;
+  const cycleRounds = _v(live.round?.cycleRounds);
+  if (elapsedFrac == null && Array.isArray(cycleRounds) && cycleRounds.length){
+    // Sorted desc by id; oldest = last
+    const oldest = cycleRounds[cycleRounds.length-1];
+    if (oldest?.startedAt){
+      const startMs = Date.parse(oldest.startedAt);
+      const elapsedMs = Date.now() - startMs;
+      // Cap at 7 days; if longer, the cycle just hasn't ended yet
+      elapsedFrac = Math.max(0.01, Math.min(0.99, elapsedMs / (7*24*3600*1000)));
+    }
+  }
+  // If still null, assume mid-cycle (3.5 days)
+  if (elapsedFrac == null) elapsedFrac = 0.5;
+
+  // Observed BTC for clan this cycle (already computed in parser)
+  const observedClanBtc = _v(live.rewards?.currentCycleClanBtcTotal);
+  if (observedClanBtc != null && share != null && elapsedFrac > 0){
+    // Watch out for partial pagination: if pagination warning triggered, we
+    // know our number is conservative. Flag it.
+    const pag = _v(live.rewards?.rewardsPaginationStatus);
+    const partial = !!(pag && pag.partial);
+    const yourObservedBtc = observedClanBtc * share;
+    const yourFullCycleBtc = yourObservedBtc / elapsedFrac;
+    out.signals.live = {
+      btc: yourFullCycleBtc,
+      observedBtc: yourObservedBtc,
+      elapsedFrac,
+      partial,
+      formula: `(observedClanBtc=${fmt(observedClanBtc,6)} × share=${fmt(share,4)}) / elapsedFrac=${fmt(elapsedFrac,3)} = ${fmt(yourFullCycleBtc,6)} BTC`,
+    };
+    if (partial) out.notes.push('live: rewards history partial → observed undercounted');
+  } else out.notes.push('live: missing currentCycleClanBtcTotal or share or elapsed');
+
+  // ----- BLEND -----
+  // Mode forces specific signal, else auto-blend
+  let projBtc = null, blendNote = '';
+  const sa = out.signals.live, sb = out.signals.prior, sc = out.signals.baseline;
+
+  if (mode === 'live' && sa) { projBtc = sa.btc; blendNote = 'LIVE only'; }
+  else if (mode === 'prior' && sb) { projBtc = sb.btc; blendNote = 'PRIOR only'; }
+  else if (mode === 'baseline' && sc) { projBtc = sc.btc; blendNote = 'BASELINE only'; }
+  else if (mode === 'manual'){
+    // Manual mode uses overrides as the single signal
+    if (userTh && leagueTh && fundBtc){
+      projBtc = (userTh / leagueTh) * fundBtc * luckFwd;
+      blendNote = `MANUAL (userTh/leagueTh × fundBtc × luck=${fmt(luckFwd,2)})`;
+    }
+  }
+  else { // auto
+    let α = sa ? Math.max(0, Math.min(0.85, elapsedFrac)) : 0;
+    let β = sb ? Math.min(0.5, (sb.cyclesUsed||0) / 4) : 0;
+    let γ = Math.max(0.15, 1 - α - β);
+    // Renormalize so weights sum to 1
+    const total = α + β + γ; α/=total; β/=total; γ/=total;
+    out.weights = { live: α, prior: β, baseline: γ };
+    let acc = 0;
+    if (sa) acc += α * sa.btc;
+    if (sb) acc += β * sb.btc;
+    if (sc) acc += γ * sc.btc;
+    projBtc = acc;
+    blendNote = `AUTO blend: live=${(α*100).toFixed(0)}% prior=${(β*100).toFixed(0)}% baseline=${(γ*100).toFixed(0)}%`;
+  }
+
+  // ----- CONFIDENCE -----
+  // High = live signal late + prior signal exists. Low = baseline only.
+  let conf = 'low';
+  if (out.signals.live && elapsedFrac > 0.5 && out.signals.prior) conf = 'high';
+  else if (out.signals.live || out.signals.prior) conf = 'medium';
+  if (mode === 'baseline' || mode === 'manual') conf = 'low';
+  out.confidence = conf;
+
+  out.blended = projBtc;
+  out.blendNote = blendNote;
+  out.elapsedFrac = elapsedFrac;
+  return out;
+}
+
+// === Render ===
+function row(parent, k, val, opts){
+  opts = opts || {};
+  const div = document.createElement('div');
+  div.className = 'kv';
+  const valTxt  = (val === null || val === undefined) ? '—' : (typeof val === 'object' ? '[obj]' : String(val));
+  const cls     = opts.warn ? 'warn' : opts.err ? 'err' : (val==null ? 'dim' : '');
+  const tagHtml = opts.tag ? `<span class="tag ${opts.tagCls||''}">${opts.tag}</span>` : '';
+  const srcHtml = opts.src ? `<div class="src">${opts.src}</div>` : '';
+  div.innerHTML = `<span class="k">${k}</span><span></span><span class="v ${cls}">${valTxt}${tagHtml}</span>${srcHtml}`;
+  parent.appendChild(div);
+}
+function fmt(x, dp){ if(x==null) return null; const n = +x; return Number.isFinite(n) ? n.toFixed(dp ?? 4) : String(x); }
+function fmtPct(x, dp){ if(x==null) return null; return (x*100).toFixed(dp ?? 3) + '%'; }
+function srcOf(field){ return field && field.sourceEndpoint ? field.sourceEndpoint.split('/').slice(-2).join('/') : ''; }
+
+function render(live, math){
+  // --- You ---
+  const u = $('#kv-user'); u.innerHTML='';
+  row(u,'User ID', v(live.user.userId), {src:srcOf(live.user.userId)});
+  row(u,'Alias',   v(live.user.alias),  {src:srcOf(live.user.alias)});
+  row(u,'Your TH (base)', fmt(math.userTh,4), {src:srcOf(live.user.baseTh)});
+  row(u,'Your W/TH',      fmt(math.userWth,2), {src:srcOf(live.user.wPerTh)});
+  row(u,'Clan owner?',    String(v(live.user.isClanOwner) ?? '—'), {src:srcOf(live.user.isClanOwner)});
+  row(u,'User rank',      v(live.user.rank), {src:srcOf(live.user.rank)});
+
+  // --- Clan ---
+  const c = $('#kv-clan'); c.innerHTML='';
+  row(c,'Clan ID',     v(live.clan.clanId), {src:srcOf(live.clan.clanId)});
+  row(c,'Clan name',   v(live.clan.name),   {src:srcOf(live.clan.name)});
+  row(c,'Members',     v(live.clan.usersCount), {src:srcOf(live.clan.usersCount)});
+  row(c,'NFTs',        v(live.clan.nftsCount), {src:srcOf(live.clan.nftsCount)});
+  row(c,'Total base TH', fmt(math.clanTh,4), {src:srcOf(live.clan.totalBaseTh)});
+  row(c,'Clan rank',   v(live.clan.rank), {src:srcOf(live.clan.rank)});
+  row(c,'Blocks mined (ALL-TIME)', v(live.clan.blocksMined), {src:srcOf(live.clan.blocksMined)+' — clan created '+(v(live.clan.createdAt)||'?')});
+  row(c,'Power share %', fmt(v(live.clan.powerSharePct),3), {src:srcOf(live.clan.powerSharePct)});
+  row(c,'Score share %', fmt(v(live.clan.scoreSharePct),3), {src:srcOf(live.clan.scoreSharePct)});
+  row(c,'Luck (cycle)', fmt(v(live.clan.luck),3), {src:srcOf(live.clan.luck)});
+  row(c,'YOUR share of clan', math.userClanShare!=null ? fmtPct(math.userClanShare,3) : '—',
+      {tag:'derived', tagCls:'warn', src: srcOf(live.user.baseTh)+' / '+srcOf(live.clan.totalBaseTh)});
+
+  // --- League ---
+  const lg = $('#kv-league'); lg.innerHTML='';
+  row(lg,'League ID',  v(live.league.leagueId), {src:srcOf(live.league.leagueId)});
+  row(lg,'League name', v(live.league.leagueName), {src:srcOf(live.league.leagueName)});
+  row(lg,'Level',       v(live.league.level), {src:srcOf(live.league.level)});
+  row(lg,'Total clans', v(live.league.clanCount) ?? v(live.league.totalClansCount), {src:srcOf(live.league.clanCount)||srcOf(live.league.totalClansCount)});
+  row(lg,'Total power (TH)', fmt(math.leagueTh,1), {src:srcOf(live.league.totalPowerTh)});
+  row(lg,'Avg W/TH',    fmt(math.leagueAvgWth,2), {src:srcOf(live.league.averageWPerTh)});
+  row(lg,'BTC reward fund', fmt(math.fundBtc,8), {src:srcOf(live.league.btcRewardFund)});
+  row(lg,'Total mined blocks (cycle)', v(live.league.totalMinedBlocks), {src:srcOf(live.league.totalMinedBlocks)});
+  row(lg,'Status',      v(live.league.status), {src:srcOf(live.league.status)});
+  row(lg,'Max multiplier', v(live.league.maxMultiplier), {src:srcOf(live.league.maxMultiplier)});
+
+  // --- Round ---
+  const r = $('#kv-round'); r.innerHTML='';
+  const my = v(live.round.myClanRound);
+  row(r,'Round type', v(live.round.type), {src:srcOf(live.round.type)});
+  row(r,'Clan count this round', v(live.round.clanCount), {src:srcOf(live.round.clanCount)});
+  if (my){
+    row(r,'My clan rank in round', my.rank, {src:'round.me.rank'});
+    row(r,'Win chance / round', my.winChance!=null ? fmtPct(my.winChance,3) : '—', {src:'round.me.chance'});
+    row(r,'Round score (current)', my.currentAddedScore, {src:'round.me.currentAddedScore'});
+    row(r,'Active boost score', my.activeBoostScore, {src:'round.me.activeBoostScore'});
+    row(r,'Total round score', fmt(my.score,2), {src:'round.me.score'});
+  } else {
+    row(r,'Round me', '—');
+  }
+  const lastR = v(live.round.lastRound);
+  if (lastR){
+    row(r,'Last round id', lastR.id, {src:srcOf(live.round.lastRound)});
+    row(r,'Last round multiplier', '×'+lastR.multiplier, {src:srcOf(live.round.lastRound)});
+    row(r,'Last round winner clan', lastR.winnerClanId ?? '— not yet decided —', {src:srcOf(live.round.lastRound)});
+  }
+  row(r,'Cycle: total rounds (so far)', v(live.round.cycleRoundCount), {src:srcOf(live.round.cycleRoundCount)});
+  row(r,'Cycle: decided rounds',       v(live.round.cycleDecidedCount), {src:srcOf(live.round.cycleDecidedCount)});
+  row(r,'Cycle: YOUR clan wins',       v(live.round.cycleYourClanWins), {src:srcOf(live.round.cycleYourClanWins)});
+  const mh = v(live.round.cycleMultHistogram);
+  if (mh){
+    const txt = Object.entries(mh).sort((a,b)=>+a[0]-+b[0]).map(([k,n])=>`×${k}:${n}`).join(' ');
+    row(r,'Cycle: multiplier histogram', txt, {src:srcOf(live.round.cycleMultHistogram)});
+  }
+
+  // --- Bot ---
+  const b = $('#kv-bot'); b.innerHTML='';
+  const bal = v(live.boosts.botBalanceGmt);
+  row(b,'Bot balance (GMT)', bal!=null ? fmt(bal,4) : '—', {src:srcOf(live.boosts.botBalanceGmt)});
+  const rules = v(live.boosts.botRules);
+  const cat = v(live.boosts.abilityCatalog) || [];
+  const priceById = {}, nameById = {};
+  for (const a of cat){ priceById[a.id] = +a.priceInGMT||0; nameById[a.id] = a.name + (a.subtype?(' ['+a.subtype+']'):''); }
+  row(b,'Ability catalog (active spells)', cat.length, {src:srcOf(live.boosts.abilityCatalog)});
+  row(b,'Active bot rules', rules ? rules.length : 0, {src:srcOf(live.boosts.botRules)});
+  if (Array.isArray(rules)){
+    rules.forEach(rl => {
+      const parts = (rl.data||[]).map(d=>{
+        const nm = nameById[d.abilityId] || d.abilityId.slice(0,8)+'…';
+        const cost = priceById[d.abilityId];
+        return `${d.count}× ${nm}${cost!=null ? ` (${(d.count*cost).toFixed(0)} GMT)`:''}`;
+      });
+      const totalCost = (rl.data||[]).reduce((s,d)=>s+((priceById[d.abilityId]||0)*(d.count||0)),0);
+      row(b, `Rule ×${rl.multiplier} (${rl.active?'ON':'off'})`,
+          parts.join(', ') + (totalCost ? ` = ${totalCost.toFixed(1)} GMT/use` : ''),
+          {src:'botRules[] × abilityCatalog'});
+    });
+  }
+  const used = v(live.boosts.usedAbilitiesByUser);
+  let usedTotal = 0, usedSpend = 0;
+  if (used){
+    for (const u of used){
+      usedTotal += u.count||0;
+      usedSpend += (priceById[u.nftGameAbilityId]||0)*(u.count||0);
+    }
+  }
+  row(b,'Your abilities used (cycle, count)', usedTotal, {src:srcOf(live.boosts.usedAbilitiesByUser)});
+  row(b,'Your boost spend (cycle, GMT)', fmt(usedSpend,2), {src:'used × catalog'});
+
+  // --- Rewards ---
+  const rw = $('#kv-rewards'); rw.innerHTML='';
+  row(rw,'Total deposit BTC (cumulative)', fmt(v(live.rewards.totalDepositBtc),8), {src:srcOf(live.rewards.totalDepositBtc)});
+  row(rw,'Total GMT fund deposit',         fmt(v(live.rewards.totalDepositGmtFund),4), {src:srcOf(live.rewards.totalDepositGmtFund)});
+  row(rw,'Owner GMT fund deposit',         fmt(v(live.rewards.totalDepositGmtFundOwner),4), {src:srcOf(live.rewards.totalDepositGmtFundOwner)});
+  row(rw,'Current cycle ID',               v(live.rewards.currentCycleId), {src:srcOf(live.rewards.currentCycleId)});
+  const pag = v(live.rewards.rewardsPaginationStatus);
+  if (pag && pag.partial){
+    row(rw,'⚠ Pagination warning', `loaded ${pag.loaded}/${pag.total} rows — scroll the Rewards page to bottom in app.gomining.com to capture full history`,
+        {tag:'PARTIAL', tagCls:'err'});
+  }
+  row(rw,'Clan ROUNDS WON in current cycle', v(live.rewards.currentCycleClanRounds), {src:srcOf(live.rewards.currentCycleClanRounds)});
+  row(rw,'Clan BTC won this cycle',        fmt(v(live.rewards.currentCycleClanBtcTotal),8), {src:srcOf(live.rewards.currentCycleClanBtcTotal)});
+  row(rw,'YOUR MW total income (cumulative)', fmt(v(live.rewards.mwTotalIncome),8), {src:srcOf(live.rewards.mwTotalIncome)});
+  row(rw,'YOUR MW today income',           fmt(v(live.rewards.mwTodayIncome),8), {src:srcOf(live.rewards.mwTodayIncome)});
+  row(rw,'YOUR MW BTC last N days',        fmt(v(live.rewards.mwBtcLastNDays),8), {src:srcOf(live.rewards.mwBtcLastNDays)});
+  row(rw,'YOUR MW GMT last N days',        fmt(v(live.rewards.mwGmtLastNDays),4), {src:srcOf(live.rewards.mwGmtLastNDays)});
+  row(rw,'Last day MW BTC (home page)',    fmt(v(live.rewards.lastDayMwBtc),8), {src:srcOf(live.rewards.lastDayMwBtc)});
+  row(rw,'Last day MW GMT (home page)',    fmt(v(live.rewards.lastDayMwGmt),4), {src:srcOf(live.rewards.lastDayMwGmt)});
+
+  // --- Math ---
+  const m = $('#math-block'); m.innerHTML='';
+  m.insertAdjacentHTML('beforeend',`
+    <pre class="formula">prices: BTC=<span class="num">$${fmt(math.btcUsd,2)}</span> (${srcOf(live.prices.btcUsd)||'override'})  ·  GMT=<span class="num">$${fmt(math.gmtUsd,4)}</span> (${srcOf(live.prices.gmtUsd)||'override'})</pre>`);
+  m.insertAdjacentHTML('beforeend',`
+    <pre class="formula">userClanShare = <span class="hl">userBaseTh</span> / <span class="hl">clanTotalBaseTh</span>
+                = <span class="num">${fmt(math.userTh,4)}</span> / <span class="num">${fmt(math.clanTh,4)}</span>
+                = <span class="num">${math.userClanShare!=null ? fmtPct(math.userClanShare,4):'—'}</span></pre>`);
+  m.insertAdjacentHTML('beforeend',`
+    <pre class="formula">clanFairBtc/cycle = (<span class="hl">clanTh</span>/<span class="hl">leagueTh</span>) × <span class="hl">btcRewardFund</span>
+                  = (<span class="num">${fmt(math.clanTh,2)}</span>/<span class="num">${fmt(math.leagueTh,1)}</span>) × <span class="num">${fmt(math.fundBtc,8)}</span>
+                  = <span class="num">${fmt(math.clanFairBtc,8)} BTC</span></pre>`);
+  m.insertAdjacentHTML('beforeend',`
+    <pre class="formula">yourFairBtc/cycle  = clanFairBtc × userClanShare
+                   = <span class="num">${fmt(math.clanFairBtc,8)}</span> × <span class="num">${math.userClanShare!=null?fmtPct(math.userClanShare,4):'—'}</span>
+                   = <span class="num">${fmt(math.yourFairBtc,8)} BTC</span>
+                   ≈ <span class="num">${(math.yourFairBtc!=null && math.btcUsd!=null) ? '$'+(math.yourFairBtc*math.btcUsd).toFixed(2) : '—'}</span></pre>`);
+  m.insertAdjacentHTML('beforeend',`
+    <pre class="formula">cycleObservedYourBtc = <span class="hl">currentCycleClanBtcTotal</span> × userClanShare
+                    = <span class="num">${fmt(math.cycleClanBtc,8)}</span> × <span class="num">${math.userClanShare!=null?fmtPct(math.userClanShare,4):'—'}</span>
+                    = <span class="num">${fmt(math.yourCycleBtc,8)} BTC</span></pre>`);
+  m.insertAdjacentHTML('beforeend',`
+    <pre class="formula">excessFeeContext = leagueAvgWth - yourWth
+                  = <span class="num">${fmt(math.leagueAvgWth,2)}</span> - <span class="num">${fmt(math.userWth,2)}</span>
+                  = <span class="num">${fmt(math.wthDelta,2)} W/TH</span>
+   <span class="hl">→ if positive, you're more efficient than league avg → no extra tax burden</span>
+   <span class="hl">→ if negative, your efficiency drag costs ~ Δ × yourTh × 24 × elec × 7 / 1000 USD/wk</span></pre>`);
+
+  // --- Raw dump ---
+  $('#raw-dump').textContent = JSON.stringify(live, (k,v)=>v, 2);
+
+  // --- Endpoint coverage ---
+  // Each entry: [sourceKey, displayName, "where to capture"]
+  const wanted = [
+    ['leagueIndex',     'league/index',                        'MW main page (auto)'],
+    ['leaderboard',     'clan-leaderboard/index-v2',           'MW → Leaderboard tab'],
+    ['clanDetail',      'clan/get-by-id',                      'MW → Clan tab (your clan)'],
+    ['clanMy',          'clan/get-my',                         'MW main page (auto)'],
+    ['roundState',      'round/get-state',                     'MW → Mining (during active round)'],
+    ['roundLast',       'round/get-last',                      'MW → Mining (between rounds)'],
+    ['cycleRounds',     'round/find-by-cycleId',               'MW → Stats / Round history'],
+    ['positions',       'league/get-user-positions-data',      'MW main page (auto)'],
+    ['rewardsByUser',   'rewards-by-user',                     'MW → Rewards/History — scroll to bottom'],
+    ['totalRewards',    'get-total-reward-by-user',            'MW → Stats / Total earnings'],
+    ['botConfig',       'nft-game-bot/index',                  'MW → Spell Bot tab'],
+    ['botBalance',      'nft-game-bot-balance/get-my',         'MW → Spell Bot tab'],
+    ['userProfile',     'nft-game-user-profile/get-my',        'MW main page (auto)'],
+    ['tokenBalances',   'nft-game-token/get-balances',         'MW main page (auto)'],
+    ['abilityCatalog',  'nft-game-ability/find-all',           'MW → Shop / Abilities'],
+    ['mwRewardHistory', 'nft-game-income/find-aggregated-by-date', 'MW → Rewards (per-day chart)'],
+    ['mwTotal',         'nft-game-income/get-total',           'MW main page (auto)'],
+    ['prices',          'exchanges/getPrice (BTC)',            'Home / Wallet'],
+    ['tokenPrice',      'exchanges/getTokenPrice (GMT)',       'Home / Wallet'],
+    ['homePage',        'home-page/get-info-v2',               'Home page (auto)'],
+    ['maintenanceState','action/get-maintenance-state',        'Click Service button on a miner'],
+  ];
+  const list = $('#endpoint-list'); list.innerHTML='';
+  wanted.forEach(([k,name,hint])=>{
+    const ok = !!live.sources[k];
+    const div = document.createElement('div');
+    div.className = ok ? 'ok' : 'miss';
+    div.innerHTML = (ok?'✓ ':'✗ ') + name + (ok ? '' : ` <span style="color:#4a5568">— ${hint}</span>`);
+    list.appendChild(div);
+  });
+
+  // --- Banner ---
+  const ban = $('#banner');
+  const hasMain = math.userTh && math.clanTh && math.leagueTh && math.fundBtc;
+  if (hasMain){
+    ban.className = 'banner';
+    ban.innerHTML = `<div class="dot"></div><div><strong>Live data parsed</strong> — your share of clan = ${fmtPct(math.userClanShare,3)}, fair BTC/cycle ≈ ${fmt(math.yourFairBtc,8)} BTC</div>`;
+  } else {
+    ban.className = 'banner warn';
+    ban.innerHTML = `<div class="dot warn"></div><div><strong>Partial data</strong> — missing: ${[!math.userTh&&'userTh',!math.clanTh&&'clanTh',!math.leagueTh&&'leagueTh',!math.fundBtc&&'fundBtc'].filter(Boolean).join(', ')}</div>`;
+  }
+}
+
+// === State + actions ===
+let captures = []; // [{url, data}]
+
+function ovValues(){
+  return {
+    th:  $('#ov-th').value,
+    wth: $('#ov-wth').value,
+    btc: $('#ov-btc').value,
+    gmt: $('#ov-gmt').value,
+    pr:  $('#ov-pr').value,
+    svc: $('#ov-svc').value,
+  };
+}
+function renderProjection(proj, math){
+  const el = $('#proj-block'); el.innerHTML = '';
+  const btcUsd = math.btcUsd;
+  const usd = (btc) => btc!=null && btcUsd ? '$'+(btc*btcUsd).toFixed(2) : '—';
+
+  // Headline
+  const conf = proj.confidence;
+  const confColor = conf==='high'?'var(--green)':conf==='medium'?'var(--yellow)':'var(--red)';
+  el.insertAdjacentHTML('beforeend',`
+    <div style="background:#0c1220;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">Projected this cycle (BTC, gross)</div>
+      <div style="font-size:28px;font-weight:700;color:${confColor};font-family:ui-monospace,Menlo,monospace">
+        ${proj.blended!=null ? fmt(proj.blended,8) : '—'} BTC
+      </div>
+      <div style="color:var(--dim);font-size:13px;margin-top:2px">
+        ${proj.blended!=null ? '≈ '+usd(proj.blended) : ''} ·
+        confidence: <span style="color:${confColor};font-weight:700">${conf.toUpperCase()}</span> ·
+        ${proj.blendNote||''}
+      </div>
+    </div>`);
+
+  // ===== Daily averages: pre-fee, fees, post-fee =====
+  // Daily gross = cycleGross / 7
+  // Service fee/day = $0.0089 × yourTh   (always charged, both modes)
+  // Excess fee/day  = max(0, leagueAvgWth - yourWth) × yourTh × 24h / 1000 × elec_rate
+  //   = the "war tax" because your kWh draw is recomputed at LEAGUE avg in MW
+  const elec = (+($('#mp-elec') ? $('#mp-elec').value : '') || 0.05);
+  const cycleBtc = proj.blended;
+  if (cycleBtc != null && math.userTh){
+    const dailyGrossBtc = cycleBtc / 7;
+    const dailyGrossUsd = dailyGrossBtc * (btcUsd||0);
+    const svcDaily      = (+math.svc || 0.0089) * math.userTh;          // $/day
+    const wthDelta      = (math.leagueAvgWth && math.userWth) ? Math.max(0, math.leagueAvgWth - math.userWth) : 0;
+    const excessDailyKwh= wthDelta * math.userTh * 24 / 1000;            // kWh/day
+    const excessDailyUsd= excessDailyKwh * elec;                         // $/day
+    const totalFeesUsd  = svcDaily + excessDailyUsd;
+    const dailyNetUsd   = dailyGrossUsd - totalFeesUsd;
+    el.insertAdjacentHTML('beforeend',`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="background:#0c1220;border:1px solid var(--border);border-radius:8px;padding:10px">
+          <div class="muted" style="text-transform:uppercase;font-size:10px;letter-spacing:.06em">Daily GROSS</div>
+          <div style="font-size:18px;font-weight:700;color:var(--green);font-family:ui-monospace,Menlo,monospace">${fmt(dailyGrossBtc,8)} BTC</div>
+          <div class="muted" style="font-size:12px">≈ $${dailyGrossUsd.toFixed(2)}/day · cycle/7</div>
+        </div>
+        <div style="background:#0c1220;border:1px solid var(--border);border-radius:8px;padding:10px">
+          <div class="muted" style="text-transform:uppercase;font-size:10px;letter-spacing:.06em">Daily FEES</div>
+          <div style="font-size:18px;font-weight:700;color:var(--yellow);font-family:ui-monospace,Menlo,monospace">−$${totalFeesUsd.toFixed(2)}</div>
+          <div class="muted" style="font-size:12px">svc=$${svcDaily.toFixed(2)} + war-tax=$${excessDailyUsd.toFixed(2)}</div>
+        </div>
+        <div style="background:#0c1220;border:1px solid var(--border);border-radius:8px;padding:10px">
+          <div class="muted" style="text-transform:uppercase;font-size:10px;letter-spacing:.06em">Daily NET</div>
+          <div style="font-size:18px;font-weight:700;color:${dailyNetUsd>=0?'var(--green)':'var(--red)'};font-family:ui-monospace,Menlo,monospace">$${dailyNetUsd.toFixed(2)}</div>
+          <div class="muted" style="font-size:12px">post-fee · ×7 = $${(dailyNetUsd*7).toFixed(2)}/wk</div>
+        </div>
+      </div>
+      <pre class="formula">svcDaily   = svcRate × userTh = <span class="num">$${(+math.svc||0.0089).toFixed(4)}</span> × <span class="num">${fmt(math.userTh,2)}</span> = <span class="num">$${svcDaily.toFixed(2)}/day</span>
+warTaxDay  = max(0, leagueAvgWth - userWth) × userTh × 24/1000 × elecRate
+           = max(0, <span class="num">${fmt(math.leagueAvgWth,2)}</span> - <span class="num">${fmt(math.userWth,2)}</span>) × <span class="num">${fmt(math.userTh,2)}</span> × 24/1000 × $${elec.toFixed(3)}
+           = <span class="num">${excessDailyKwh.toFixed(3)} kWh/day</span> × $${elec.toFixed(3)} = <span class="num">$${excessDailyUsd.toFixed(2)}/day</span>
+dailyNet   = dailyGross - svc - warTax = <span class="num">$${dailyGrossUsd.toFixed(2)}</span> - <span class="num">$${svcDaily.toFixed(2)}</span> - <span class="num">$${excessDailyUsd.toFixed(2)}</span> = <span class="num">$${dailyNetUsd.toFixed(2)}/day</span></pre>`);
+  }
+
+  // Per-signal rows
+  const signalRow = (label, sig, weightFrac) => {
+    if (!sig) return `<div class="kv"><span class="k">${label}</span><span></span><span class="v dim">— missing</span></div>`;
+    const w = weightFrac!=null ? ` <span class="tag">${(weightFrac*100).toFixed(0)}% weight</span>` : '';
+    return `<div class="kv"><span class="k">${label}${w}</span><span></span><span class="v">${fmt(sig.btc,8)} BTC ≈ ${usd(sig.btc)}</span><div class="src">${sig.formula||''}</div></div>`;
+  };
+  el.insertAdjacentHTML('beforeend', signalRow('🔴 Live extrapolation', proj.signals.live, proj.weights.live));
+  el.insertAdjacentHTML('beforeend', signalRow('🟡 Prior-cycles average', proj.signals.prior, proj.weights.prior));
+  el.insertAdjacentHTML('beforeend', signalRow('⚪ Statistical baseline', proj.signals.baseline, proj.weights.baseline));
+
+  // Elapsed bar
+  if (proj.elapsedFrac != null){
+    const pct = (proj.elapsedFrac*100).toFixed(1);
+    el.insertAdjacentHTML('beforeend',`
+      <div style="margin-top:10px">
+        <div class="muted" style="margin-bottom:4px">Cycle elapsed: <strong style="color:var(--ink)">${pct}%</strong> (≈ ${(proj.elapsedFrac*7).toFixed(1)}d / 7d)</div>
+        <div style="height:6px;background:#0c1220;border:1px solid var(--border);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--green),var(--yellow))"></div>
+        </div>
+      </div>`);
+  }
+
+  // Notes
+  if (proj.notes && proj.notes.length){
+    el.insertAdjacentHTML('beforeend',`<details style="margin-top:8px"><summary>⚠ ${proj.notes.length} note(s)</summary><pre>${proj.notes.join('\n')}</pre></details>`);
+  }
+}
+
+/* =================================================================
+   BLOCK-PACE PROJECTION — "if clan keeps this pace, weekly $$"
+   =================================================================
+   Two inputs:
+     (a) live pace: how many blocks YOUR clan won this cycle so far,
+         normalized to /week. Source: rewards-by-user filtered to current cycle.
+         Note: this is paginated, so we flag if data is partial.
+     (b) hypothetical: user types a weekly block count. Bypasses live count.
+
+   Math:
+     blocksPerWeek    = (override) OR (cycleBlocksWon / elapsedFrac)
+     avgBtcPerBlock   = (override) OR (leagueBtcFund / leagueRoundsPerCycle)
+       leagueRoundsPerCycle ≈ 7d × 24h × 60min / 3min ≈ 3360 rounds
+       — ALL of league fund split across the rounds your league plays —
+       — but only WINNING clans get paid; ~26% of rounds have a winner each
+         (rough estimate from observed multiplier histogram)
+       — so realistic avgBtcPerBlock = leagueBtcFund / leagueDecidedRounds
+     yourClanWeeklyBtc = blocksPerWeek × avgBtcPerBlock
+     yourWeeklyBtc     = yourClanWeeklyBtc × yourClanShare × luckFwd
+   ================================================================= */
+function runBlockPace(live, math, ov){
+  const _v = (x) => (x && typeof x === 'object' && 'value' in x) ? x.value : x;
+  const out = { notes: [] };
+
+  // 1. Live cycle pace — count clan wins this cycle so far, divide by elapsed
+  const rewards    = _v(live.rewards?.clanRewardsItems);
+  const currentCyc = _v(live.rewards?.currentCycleId);
+  const pag        = _v(live.rewards?.rewardsPaginationStatus);
+  let cycleBlocks = 0;
+  if (Array.isArray(rewards) && currentCyc != null){
+    cycleBlocks = rewards.filter(r => r.cycleId === currentCyc).length;
+  }
+  // 2. Elapsed fraction of week — same logic as runProjection
+  let elapsedFrac = +ov.elapsed ? (+ov.elapsed / 7) : null;
+  const cycleRounds = _v(live.round?.cycleRounds);
+  if (elapsedFrac == null && Array.isArray(cycleRounds) && cycleRounds.length){
+    const oldest = cycleRounds[cycleRounds.length-1];
+    if (oldest?.startedAt){
+      const ms = Date.now() - Date.parse(oldest.startedAt);
+      elapsedFrac = Math.max(0.01, Math.min(0.99, ms / (7*24*3600*1000)));
+    }
+  }
+  if (elapsedFrac == null) elapsedFrac = 0.5;
+
+  const livePaceBlocksPerWeek = (cycleBlocks > 0 && elapsedFrac > 0) ? cycleBlocks / elapsedFrac : null;
+
+  // 3. Hypothetical override
+  const hypothetical = +ov.bpHypothetical || null;
+  const blocksPerWeek = hypothetical || livePaceBlocksPerWeek;
+
+  // 4. Avg BTC per block: prefer override, else league-derived
+  const fundBtc          = math.fundBtc;
+  // Estimate decided rounds in league per cycle: count the cycle's round histogram
+  // (every round has a decided multiplier; we don't have winnerClanId for all
+  // rounds since most are still pending). Use historical cycle from rewards-by-user
+  // grouped by cycleId — each row IS a winning round for SOMEONE in your league.
+  // But rewards-by-user is filtered to YOUR clan only. So we can't see league
+  // total winners. Best fallback: use cycleRoundCount × estimated win rate.
+  // Each round has 1 winning clan. So leagueWinningRounds = total rounds ended this cycle.
+  // We approximate as: cycle elapsed × 7 × 480 rounds/day = 3360 rounds/wk total,
+  //   but not every round has a winner (the round is "active" until someone wins).
+  // Simpler: avgBtcPerBlock = leagueBtcFund / leagueTotalMinedBlocks (HAR has this).
+  const leagueMinedBlocks = _v(live.league?.totalMinedBlocks);
+  let avgBtcPerBlock = +ov.bpBtcPerBlock || null;
+  if (avgBtcPerBlock == null && fundBtc != null && leagueMinedBlocks){
+    avgBtcPerBlock = fundBtc / leagueMinedBlocks;
+    out.notes.push(`avgBtcPerBlock = leagueBtcFund / leagueMinedBlocks = ${fmt(fundBtc,6)} / ${leagueMinedBlocks} = ${fmt(avgBtcPerBlock,8)} BTC`);
+  }
+  // If still null (manual mode without league data), back-compute from share.
+  // baselineProj = (yourTh/leagueTh) × fundBtc; that == clanBlocks/leagueBlocks × fundBtc × share.
+  // We have no leagueBlocks → use 100 as rough mid for week.
+  if (avgBtcPerBlock == null && fundBtc != null){
+    avgBtcPerBlock = fundBtc / 100;
+    out.notes.push(`avgBtcPerBlock fallback: leagueBtcFund / 100 (no totalMinedBlocks) = ${fmt(avgBtcPerBlock,8)} BTC`);
+  }
+
+  // 5. Your share + luck
+  const share   = math.userClanShare;
+  const userLuck = +ov.luck;
+  const luckFwd = (userLuck > 0) ? userLuck : 1;
+
+  // 6. Compute weekly results
+  const clanWeeklyBtc = (blocksPerWeek != null && avgBtcPerBlock != null) ? blocksPerWeek * avgBtcPerBlock : null;
+  const yourWeeklyBtc = (clanWeeklyBtc != null && share != null) ? clanWeeklyBtc * share * luckFwd : null;
+
+  out.cycleBlocksObserved = cycleBlocks;
+  out.elapsedFrac = elapsedFrac;
+  out.livePaceBlocksPerWeek = livePaceBlocksPerWeek;
+  out.hypotheticalUsed = hypothetical != null;
+  out.blocksPerWeek = blocksPerWeek;
+  out.avgBtcPerBlock = avgBtcPerBlock;
+  out.clanWeeklyBtc = clanWeeklyBtc;
+  out.yourWeeklyBtc = yourWeeklyBtc;
+  out.luckFwd = luckFwd;
+  out.partial = !!(pag && pag.partial);
+  return out;
+}
+
+function renderBlockPace(bp, math){
+  const el = $('#block-pace-block'); el.innerHTML = '';
+  const btcUsd = math.btcUsd;
+  const usd = (btc) => btc!=null && btcUsd ? '$'+(btc*btcUsd).toFixed(2) : '—';
+
+  const dayN = (bp.elapsedFrac*7).toFixed(1);
+  const headline = bp.hypotheticalUsed ? 'Hypothetical pace' : 'Live cycle pace';
+  const paceColor = bp.hypotheticalUsed ? 'var(--purple)' : 'var(--green)';
+
+  // Day-1 style narrative
+  let narrative = '';
+  if (!bp.hypotheticalUsed && bp.cycleBlocksObserved > 0){
+    narrative = `Your clan has won <strong>${bp.cycleBlocksObserved}</strong> block${bp.cycleBlocksObserved===1?'':'s'} in the first <strong>${dayN}d</strong> of this cycle. ` +
+                `If you keep this pace, that's <strong>${bp.livePaceBlocksPerWeek?.toFixed(0) ?? '—'}</strong> blocks/week.`;
+  } else if (bp.hypotheticalUsed){
+    narrative = `Hypothetical: clan wins <strong>${bp.blocksPerWeek}</strong> block${bp.blocksPerWeek===1?'':'s'} this week.`;
+  } else {
+    narrative = `No clan wins captured yet for the current cycle ${bp.partial?'(or pagination incomplete)':''}.`;
+  }
+
+  el.insertAdjacentHTML('beforeend', `
+    <div style="background:#0c1220;border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">${headline}</div>
+      <div style="font-size:13px;color:var(--ink);margin:6px 0">${narrative}</div>
+      ${bp.partial ? '<div style="color:var(--yellow);font-size:11px;margin-bottom:6px">⚠ rewards-by-user pagination partial — observed wins may be undercounted</div>' : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+        <div>
+          <div class="muted" style="text-transform:uppercase;font-size:10px;letter-spacing:.06em">Blocks/week</div>
+          <div style="font-size:20px;font-weight:700;color:${paceColor};font-family:ui-monospace,Menlo,monospace">${bp.blocksPerWeek!=null ? bp.blocksPerWeek.toFixed(1) : '—'}</div>
+        </div>
+        <div>
+          <div class="muted" style="text-transform:uppercase;font-size:10px;letter-spacing:.06em">Clan weekly BTC</div>
+          <div style="font-size:20px;font-weight:700;color:var(--ink);font-family:ui-monospace,Menlo,monospace">${bp.clanWeeklyBtc!=null ? fmt(bp.clanWeeklyBtc,8) : '—'}</div>
+          <div class="muted" style="font-size:11px">≈ ${usd(bp.clanWeeklyBtc)}</div>
+        </div>
+        <div>
+          <div class="muted" style="text-transform:uppercase;font-size:10px;letter-spacing:.06em">YOUR weekly BTC</div>
+          <div style="font-size:20px;font-weight:700;color:var(--green);font-family:ui-monospace,Menlo,monospace">${bp.yourWeeklyBtc!=null ? fmt(bp.yourWeeklyBtc,8) : '—'}</div>
+          <div class="muted" style="font-size:11px">≈ ${usd(bp.yourWeeklyBtc)}</div>
+        </div>
+      </div>
+      <pre class="formula" style="margin-top:10px">blocksPerWeek = ${bp.hypotheticalUsed ? 'override' : '(cycleBlocksWon / elapsedFrac)'}
+              = ${bp.hypotheticalUsed ? '<span class="num">'+bp.blocksPerWeek+'</span>' : '<span class="num">'+bp.cycleBlocksObserved+'</span> / <span class="num">'+fmt(bp.elapsedFrac,3)+'</span> = <span class="num">'+(bp.livePaceBlocksPerWeek?.toFixed(2) ?? '—')+'</span>'}
+clanWeeklyBtc = blocksPerWeek × avgBtcPerBlock
+              = <span class="num">${bp.blocksPerWeek?.toFixed(1) ?? '—'}</span> × <span class="num">${fmt(bp.avgBtcPerBlock,8)}</span>
+              = <span class="num">${fmt(bp.clanWeeklyBtc,8)} BTC</span>
+yourWeeklyBtc = clanWeeklyBtc × yourClanShare × luckFwd
+              = <span class="num">${fmt(bp.clanWeeklyBtc,8)}</span> × <span class="num">${fmt(math.userClanShare,4)}</span> × <span class="num">${fmt(bp.luckFwd,2)}</span>
+              = <span class="num">${fmt(bp.yourWeeklyBtc,8)} BTC ≈ ${usd(bp.yourWeeklyBtc)}</span></pre>
+      ${bp.notes && bp.notes.length ? `<details style="margin-top:6px"><summary>notes</summary><pre>${bp.notes.join('\n')}</pre></details>` : ''}
+    </div>`);
+}
+
+let projMode = 'auto';
+function recompute(){
+  // Build the captures list, applying manual-mode synthetic captures if active
+  let caps = captures.slice();
+  if (projMode === 'manual'){
+    const mp = manualPayload();
+    if (mp) caps = caps.concat(mp);
+  }
+  const live = parseEndpoints(caps);
+  const ov   = ovValues();
+  const math = runMath(live, ov);
+  // Pull projection-specific overrides
+  ov.luck    = $('#mp-luck')    ? $('#mp-luck').value    : '';
+  ov.elapsed = $('#mp-elapsed') ? $('#mp-elapsed').value : '';
+  const proj = runProjection(live, math, ov, projMode);
+  // Pull block-pace overrides
+  ov.bpHypothetical = $('#bp-hypothetical') ? $('#bp-hypothetical').value : '';
+  ov.bpBtcPerBlock  = $('#bp-btc-per-block') ? $('#bp-btc-per-block').value : '';
+  const bp = runBlockPace(live, math, ov);
+  render(live, math);
+  renderProjection(proj, math);
+  renderBlockPace(bp, math);
+}
+
+// Build synthetic captures from the manual form so the parser works the same way
+function manualPayload(){
+  const th        = +$('#mp-th').value;
+  const wth       = +$('#mp-wth').value;
+  const maxMult   = +$('#mp-league').value;
+  const clanTh    = +$('#mp-clan-th').value;
+  const leagueTh  = +$('#mp-league-th').value;
+  const fund      = +$('#mp-fund').value;
+  if (!th || !clanTh || !leagueTh || !fund) return null;
+  const out = [];
+  // Synthetic clan/get-by-id
+  out.push({ url:'manual:///nft-game/clan/get-by-id', data:{ data:{
+    id:0, name:'Manual', power:clanTh, leagueId:0, usersCount:1, nftsCount:1,
+    myProfile:{ id:0, alias:'manual', power:th, ee:wth||15, isOwner:false }
+  }}});
+  // Synthetic clan-leaderboard
+  out.push({ url:'manual:///nft-game/clan-leaderboard/index-v2', data:{ data:{
+    btcFund: String(fund), totalPower: leagueTh, weightedEnergyEfficiencyPerTh: wth||18,
+    count: 50, totalMinedBlocks: 500, status: 'active', me:null,
+    clansPromoted:[], clansRemaining:[], clansRelegated:[]
+  }}});
+  // Synthetic league/index — a fake league with the requested max multiplier
+  const conf = [];
+  let p = 0.65; let v = 1;
+  while (v <= maxMult){ conf.push({p, v}); p *= 0.35; v *= 2; }
+  out.push({ url:'manual:///nft-game/league/index', data:{ data:{ array:[
+    { id:0, name:'manual-league', level:1, totalClansCount:50,
+      relegationToLeagueId:null, promotionToLeagueId:null, isDynamicClansMovement:false,
+      roundMultiplierConfig: conf }
+  ]}}});
+  // Synthetic positions to point at our fake league id 0
+  out.push({ url:'manual:///nft-game/league/get-user-positions-data', data:{ data:{ leagueId:0, clanRank:1, userRank:1 }}});
+  return out;
+}
+
+$('#btn-fixtures').addEventListener('click', () => {
+  const raw = document.getElementById('fixtures-data').textContent;
+  try { captures = JSON.parse(raw); recompute(); }
+  catch(e){ alert('Fixtures parse failed: ' + e.message); }
+});
+$('#btn-localStorage').addEventListener('click', () => {
+  // Best-effort: read both old and new shapes
+  let snap = null;
+  try { snap = JSON.parse(localStorage.getItem('gomining_autosync')); } catch {}
+  if (!snap){ alert('No localStorage["gomining_autosync"] found.'); return; }
+  // If snapshot stored captures already (future shape), use them; else pretend.
+  if (Array.isArray(snap.warsCaptures)) { captures = snap.warsCaptures; }
+  else if (snap.wars && snap.wars.live) {
+    // Already-normalized; render directly
+    const math = runMath(snap.wars.live, ovValues());
+    render(snap.wars.live, math);
+    return;
+  } else {
+    alert('localStorage has data but no MW captures or live block. Use HAR fixtures or paste JSON.');
+    return;
+  }
+  recompute();
+});
+$('#btn-paste').addEventListener('click', () => {
+  const url = $('#paste-url').value.trim();
+  const txt = $('#paste-json').value.trim();
+  if (!url || !txt){ alert('Need both URL and JSON'); return; }
+  let data; try { data = JSON.parse(txt); } catch(e){ alert('JSON parse: '+e.message); return; }
+  captures.push({ url, data });
+  recompute();
+});
+$('#btn-clear').addEventListener('click', () => { captures = []; recompute(); });
+$('#btn-recompute').addEventListener('click', recompute);
+['#ov-th','#ov-wth','#ov-btc','#ov-gmt','#ov-pr','#ov-svc'].forEach(s =>
+  $(s).addEventListener('input', recompute));
+
+// Projection mode buttons
+document.querySelectorAll('#proj-mode-row button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    projMode = btn.dataset.mode;
+    document.querySelectorAll('#proj-mode-row button').forEach(b =>
+      b.classList.toggle('primary', b === btn));
+    $('#proj-manual').style.display = (projMode === 'manual') ? '' : 'none';
+    recompute();
+  });
+});
+// Manual form inputs trigger recompute
+['#mp-th','#mp-wth','#mp-clan-th','#mp-league-th','#mp-fund','#mp-elapsed','#mp-luck','#mp-league','#mp-elec',
+ '#bp-hypothetical','#bp-btc-per-block'].forEach(s =>
+  $(s) && $(s).addEventListener('input', recompute));
+
+// Auto-load fixtures on first render so the page is useful immediately
+$('#btn-fixtures').click();
+</script>
+</body>
+</html>
