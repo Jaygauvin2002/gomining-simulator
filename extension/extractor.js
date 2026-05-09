@@ -52,6 +52,30 @@
     (document.head || document.documentElement).appendChild(script);
     script.onload = () => script.remove();
 
+    // === Socket.IO frame parser ===
+    // Socket.IO over WebSocket prefixes every text frame with a small numeric
+    // packet code:
+    //   0{...}    Engine.IO open handshake
+    //   2 / 3     ping / pong (no body)
+    //   40        connect
+    //   42[evt,data]   message → an event with name + payload
+    //   43...     ack (we don't use)
+    // We only care about "42" event frames. Returns { event, data } or null.
+    function parseSocketIoFrame(body) {
+        if (typeof body !== 'string') return null;
+        if (!body.startsWith('42')) return null;
+        // strip leading "42" then any optional namespace + ack id like "42/nft,123"
+        let payload = body.slice(2);
+        const bracket = payload.indexOf('[');
+        if (bracket < 0) return null;
+        payload = payload.slice(bracket);
+        try {
+            const arr = JSON.parse(payload);
+            if (!Array.isArray(arr) || arr.length === 0) return null;
+            return { event: String(arr[0]), data: arr.length > 1 ? arr[1] : null };
+        } catch (e) { return null; }
+    }
+
     // === Process one intercepted message (fetch / XHR / WS / SSE) ===
     function handleInterceptedMessage(data) {
         if (!data) return;
@@ -62,10 +86,20 @@
         if (url && (url.includes('intercom') || url.includes('scevent') || url.includes('pixel'))) return;
 
         let parsed = null;
-        try {
-            parsed = JSON.parse(body);
-        } catch (e) {
-            return; // not JSON
+        let wsEvent = null;   // event name for WS frames, null otherwise
+
+        if (type === 'GOMINING_WS') {
+            // Socket.IO frames are NOT plain JSON. Parse as event frame first.
+            const frame = parseSocketIoFrame(body);
+            if (!frame) return;            // ping/pong/handshake — drop quietly
+            wsEvent = frame.event;
+            parsed = frame.data;
+        } else {
+            try {
+                parsed = JSON.parse(body);
+            } catch (e) {
+                return; // not JSON
+            }
         }
 
         // Log entry — same shape regardless of channel, but tag the type
@@ -75,29 +109,45 @@
                       : type === 'GOMINING_SSE'   ? 'sse' : '?';
         const entry = {
             time: new Date().toISOString(),
-            url: ('[' + channel + '] ' + (url || '')).substring(0, 120),
+            url: ('[' + channel + (wsEvent ? ':'+wsEvent : '') + '] ' + (url || '')).substring(0, 120),
             size: body ? body.length : 0,
-            keys: parsed ? Object.keys(parsed).join(', ') : ''
+            keys: parsed && typeof parsed === 'object' ? Object.keys(parsed).join(', ') : ''
         };
         DATA.apiCalls.unshift(entry);
         if (DATA.apiCalls.length > 50) DATA.apiCalls.pop();
 
         // Storage strategy:
         //   fetch / XHR  → keyed by endpoint pathname (last response wins)
-        //   WS / SSE     → keyed by url + timestamp (capped at 30 frames)
-        if (type === 'GOMINING_WS' || type === 'GOMINING_SSE') {
-            const wsKey = type.toLowerCase().replace('gomining_', '') + ':' +
-                          (url || 'unknown').substring(0, 80) + ':' + Date.now();
-            DATA.miners[wsKey] = { url: '[' + channel + '] ' + url, data: parsed, time: Date.now() };
-            // Cap WS/SSE frames at 30 to avoid unbounded growth
-            const streamKeys = Object.keys(DATA.miners).filter(k => k.startsWith('ws:') || k.startsWith('sse:'));
-            if (streamKeys.length > 30) {
-                const oldest = streamKeys.sort()[0];
-                delete DATA.miners[oldest];
-            }
+        //   WS / SSE     → store under DATA.wars (NEVER DATA.miners).
+        //
+        // CRITICAL: WS frames from nft.ws.gomining.com contain `clanPower`
+        // (e.g. 1500) and `currentAddedScore` (millions). If we put them in
+        // DATA.miners the global power scanner could mis-pick them as the
+        // user's farm total. So WS goes ONLY to DATA.wars, which the solo
+        // path never reads.
+        if (type === 'GOMINING_WS') {
+            // Key by event name → only the LATEST snapshot is kept per event.
+            // For allUsersStateV2 (1Hz updates) this means we always have the
+            // freshest scoreboard but don't accumulate megabytes of history.
+            const wsKey = 'ws:' + (wsEvent || 'unknown');
+            DATA.wars[wsKey] = {
+                url: url,
+                event: wsEvent,
+                time: new Date().toISOString(),
+                data: parsed
+            };
+        } else if (type === 'GOMINING_SSE') {
+            // SSE is also non-solo. Keep in DATA.wars for safety.
+            const sseKey = 'sse:' + (url || 'unknown').substring(0, 80) + ':' + Date.now();
+            DATA.wars[sseKey] = { url: url, time: new Date().toISOString(), data: parsed };
+            // Cap at 30 SSE frames
+            const sseKeys = Object.keys(DATA.wars).filter(k => k.startsWith('sse:'));
+            if (sseKeys.length > 30) { delete DATA.wars[sseKeys.sort()[0]]; }
         }
 
         // Analyze + persist + bubble up to simulator
+        // analyzeResponse uses URL-based routing (solo allowlist + MW blocklist),
+        // so WS frames will NOT pollute DATA.miners even though they pass through.
         analyzeResponse(url || '', parsed);
         updatePanel();
         scheduleAutoSync();
@@ -141,7 +191,7 @@
         // Drop any MW-namespace URLs that previously leaked into miner/reward
         // pools (before the strict allowlist was added). Identifies them by
         // URL substring — not by content — so we don't trip on field names.
-        const isMwLeaked = (entry) => /\/nft-game\/|\/clan-leaderboard\/|\/clan\/get-by(-id|-user)|\/round\/(get-state|get-last|find-by-cycleId)|\/rewards-by-user|\/get-total-reward-by-user|\/league\/(index|get-user-positions-data)|\/nft-game-bot|\/nft-game-token|\/nft-game-ability|\/nft-game-income|\/nft-game-user-profile|\/clan-rating|\/clan-message|\/league\/find-many|\/nft-game-round/i.test(entry.url || '');
+        const isMwLeaked = (entry) => /\/nft-game\/|\/clan-leaderboard\/|\/clan\/get-by(-id|-user)|\/round\/(get-state|get-last|find-by-cycleId)|\/rewards-by-user|\/get-total-reward-by-user|\/league\/(index|get-user-positions-data)|\/nft-game-bot|\/nft-game-token|\/nft-game-ability|\/nft-game-income|\/nft-game-user-profile|\/clan-rating|\/clan-message|\/league\/find-many|\/nft-game-round|wss?:\/\/(?:[a-z0-9-]+\.)*gomining\.com/i.test(entry.url || '');
 
         let leaked = 0;
         for (const key of Object.keys(DATA.miners)) {
@@ -213,7 +263,7 @@
         // Fix: only accept URLs that look like SOLO mining endpoints, AND
         // explicitly REJECT any URL with /nft-game/ (Miner Wars namespace) or
         // /clan-leaderboard/ etc.
-        const isMwUrl = /\/nft-game\/|\/clan-leaderboard\/|\/clan\/get-by(-id|-user)|\/round\/(get-state|get-last|find-by-cycleId)|\/rewards-by-user|\/get-total-reward-by-user|\/league\/(index|get-user-positions-data)|\/nft-game-bot|\/nft-game-token|\/nft-game-ability|\/nft-game-income|\/nft-game-user-profile|\/clan-rating|\/clan-message|\/league\/find-many|\/nft-game-round/i.test(url);
+        const isMwUrl = /\/nft-game\/|\/clan-leaderboard\/|\/clan\/get-by(-id|-user)|\/round\/(get-state|get-last|find-by-cycleId)|\/rewards-by-user|\/get-total-reward-by-user|\/league\/(index|get-user-positions-data)|\/nft-game-bot|\/nft-game-token|\/nft-game-ability|\/nft-game-income|\/nft-game-user-profile|\/clan-rating|\/clan-message|\/league\/find-many|\/nft-game-round|wss?:\/\/(?:[a-z0-9-]+\.)*gomining\.com/i.test(url);
         const isSoloMinerUrl = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)|\/nft-income|\/nft-collection|\/wallet\/find-by-user|\/ve-gomining-lock|\/home-page\/get-info/i.test(url);
         if (isSoloMinerUrl && !isMwUrl) {
             const key = extractEndpointKey(url);
