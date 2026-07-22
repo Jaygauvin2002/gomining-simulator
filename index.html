@@ -3833,7 +3833,23 @@ function renderCalendar(history, chartEl) {
             const status = document.getElementById('sync-status');
             const lastSync = state.lastSyncTime;
 
-            if (state.autoSyncActive) {
+            // Freshness guard: "auto-sync active" only means a sync event fired,
+            // NOT that the data is current. If the newest COMPLETE reward day is
+            // several days old (e.g. the GoMining rewards page hasn't been opened
+            // in a while), the numbers on screen are stale — say so plainly
+            // instead of showing a reassuring green dot.
+            const lastDay = getLastCompleteRewardDay(state.rewardHistory);
+            let staleDays = 0;
+            if (lastDay?.date) {
+                staleDays = Math.floor(
+                    (Date.parse(new Date().toISOString().substring(0, 10)) - Date.parse(lastDay.date)) / 86400000
+                );
+            }
+
+            if (staleDays >= 2) {
+                dot.className = 'sync-dot stale';
+                label.textContent = t('sync_stale').replace('{n}', staleDays);
+            } else if (state.autoSyncActive) {
                 dot.className = 'sync-dot live';
                 label.textContent = t('sync_active');
             } else if (lastSync) {
@@ -4812,7 +4828,7 @@ function renderCalendar(history, chartEl) {
                 reco_then_optimal: 'then switch to the optimal strategy', reco_best_after_reserve: 'Best strategy once reserve is OK',
                 reco_at_current_prices: 'At current prices over',
                 sim_cum_profit: 'Cumulative 12-month profit', sim_optimistic: 'Optimistic', sim_pessimistic: 'Pessimistic', sim_final_th: 'Final TH',
-                sync_active: 'Auto-sync active', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync', sync_none: 'No sync', sync_last: 'Last sync',
+                sync_active: 'Auto-sync active', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync', sync_none: 'No sync', sync_last: 'Last sync', sync_stale: 'Data {n}d old — reopen GoMining to refresh',
                 sync_success: 'Data synced from extension!',
                 sync_no_data: 'No GoMining data in clipboard.\n\n1. Go to app.gomining.com\n2. Click "Copy data for Simulator" in the extension panel\n3. Come back here and click "Sync Extension"',
                 sync_clipboard_denied: 'Clipboard access denied.\nClick somewhere on the page first, then try again.',
@@ -5046,7 +5062,7 @@ function renderCalendar(history, chartEl) {
                 reco_then_optimal: 'ensuite passe à la stratégie optimale', reco_best_after_reserve: 'Meilleure stratégie une fois la réserve OK',
                 reco_at_current_prices: 'Aux prix actuels sur',
                 sim_cum_profit: 'Profit cumulé 12 mois', sim_optimistic: 'Optimiste', sim_pessimistic: 'Pessimiste', sim_final_th: 'TH final',
-                sync_active: 'Auto-sync actif', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync il y a', sync_none: 'Pas de sync', sync_last: 'Dernière sync',
+                sync_active: 'Auto-sync actif', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync il y a', sync_none: 'Pas de sync', sync_last: 'Dernière sync', sync_stale: 'Données vieilles de {n}j — rouvre GoMining pour rafraîchir',
                 sync_success: "Données synchronisées depuis l'extension !",
                 sync_no_data: "Aucune donnée GoMining dans le presse-papier.\n\n1. Va sur app.gomining.com\n2. Clique \"Copier données pour Simulateur\" dans le panel de l'extension\n3. Reviens ici et clique \"Sync Extension\"",
                 sync_clipboard_denied: "Accès au presse-papier refusé.\nClique d'abord quelque part sur la page, puis réessaie.",

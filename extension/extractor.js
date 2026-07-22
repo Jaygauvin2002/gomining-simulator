@@ -9,6 +9,22 @@
     const AUTOSYNC_DEBOUNCE_MS = 30000; // 30 seconds debounce for auto-sync
     const AUTOSYNC_FIRST_MS = 3000; // 3 seconds for first sync
 
+    // === Farm-power sanity bounds ===
+    // The global-scan and DOM layers pick the LARGEST plausible power value
+    // they can find. Without a bound they happily grab GoMining's NETWORK-WIDE
+    // hashrate (millions of TH) that also appears on the page/in responses,
+    // instead of the user's farm (~hundreds of TH). We anchor every override
+    // to the reliable per-NFT base sum (Σ n.power from /nft/get-my):
+    //   - a real farm total exceeds the base sum only modestly (boosts),
+    //   - a value 3× larger is not this farm — it's a network figure leaking in.
+    const MAX_POWER_RATIO = 3;        // farm total ≤ 3× base Σ(power)
+    const ABS_MAX_FARM_TH = 100000;   // hard ceiling when no base sum is known
+    function isPlausibleFarmPower(v, anchor) {
+        if (!(v > 0) || v >= 1e7) return false;
+        if (anchor > 0) return v <= anchor * MAX_POWER_RATIO;
+        return v < ABS_MAX_FARM_TH; // no NFT base captured → reject network-scale values
+    }
+
     // === Auto-sync: debounced save to chrome.storage.local ===
     let _autoSyncTimer = null;
     let _firstSyncDone = false;
@@ -629,6 +645,16 @@
                     powerField = 'power-fallback';
                 }
 
+                // Sanity bound: if the chosen field sums to something absurd
+                // relative to the base `power` sum (e.g. a network figure stored
+                // on the NFT payload), revert to the trustworthy base sum.
+                const baseSum = sums.power || 0;
+                if (baseSum > 0 && totalPower > baseSum * MAX_POWER_RATIO) {
+                    try { console.log('[GoMining Extractor] Rejecting implausible field sum', totalPower, 'via', powerField, '→ base', baseSum); } catch {}
+                    totalPower = baseSum;
+                    powerField = 'power (bounded)';
+                }
+
                 // Use weighted average for efficiency (always from `power` since
                 // efficiency is paired with raw power in the API)
                 const basePower = nfts.reduce((acc, n) => acc + (n.power || 0), 0);
@@ -886,8 +912,10 @@
         //     than what we summed per-NFT, prefer it — the user-facing
         //     UI almost always pulls from such a dedicated total endpoint
         //     when it exists.
+        const anchor = result.miner.apiPower || 0; // base Σ(n.power) — the reliable reference
         const globalPower = findFarmTotalAcrossResponses(result.miner.power || 0);
-        if (globalPower != null && globalPower > (result.miner.power || 0)) {
+        if (globalPower != null && globalPower > (result.miner.power || 0)
+            && isPlausibleFarmPower(globalPower, anchor)) {
             result.miner.power = globalPower;
             result.miner.powerSource = 'global-scan';
         }
@@ -896,7 +924,8 @@
         // If the Mining-farm widget is rendered on the current page, what
         // the user *sees* is the canonical source — trumps API/global scan.
         const domPower = scanFarmPowerFromDom();
-        if (domPower != null && domPower > 0) {
+        if (domPower != null && domPower > 0
+            && isPlausibleFarmPower(domPower, anchor)) {
             result.miner.power = domPower;
             result.miner.powerSource = 'dom';
         }
