@@ -50,17 +50,33 @@ if (!HAD_CACHE) {
 }
 
 const fresh = incoming.filter(t => !seenSet.has(t.txid));
+
+// Fetch the current BTC/USD price once (only if we have something to report).
+let usdPrice = null;
+if (fresh.length) {
+  try {
+    const pr = await fetch('https://mempool.space/api/v1/prices');
+    if (pr.ok) {
+      const pj = await pr.json();
+      if (typeof pj.USD === 'number') usdPrice = pj.USD;
+    }
+  } catch { /* price is best-effort; alert still fires without it */ }
+}
+
 // Oldest-first so alerts arrive in chronological order.
 for (const tx of fresh.reverse()) {
   const sats = tx.vout
     .filter(o => o.scriptpubkey_address === ADDR)
     .reduce((s, o) => s + o.value, 0);
   const btc = (sats / 1e8).toFixed(8);
+  const usd = usdPrice != null
+    ? ' · ≈ $' + (sats / 1e8 * usdPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD'
+    : '';
   const status = tx.status?.confirmed ? '✅ confirmed' : '⏳ unconfirmed (in mempool)';
   await tg(
     `🟢 <b>New BTC donation</b>\n` +
-    `<b>${btc} BTC</b> (${sats.toLocaleString('en-US')} sats)\n` +
-    `${status}\n` +
+    `<b>${btc} BTC</b>${usd}\n` +
+    `${sats.toLocaleString('en-US')} sats · ${status}\n` +
     `https://mempool.space/tx/${tx.txid}`
   );
   seenSet.add(tx.txid);
