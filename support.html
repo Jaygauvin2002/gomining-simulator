@@ -63,6 +63,9 @@
               border-radius:8px;font-weight:700;cursor:pointer;font-size:.88em}
     .copy-btn:hover{filter:brightness(1.1)}
     .copy-btn.ok{background:var(--green)}
+    .net-note{font-size:.8em;color:var(--text-dim);line-height:1.45;
+              margin:2px 0 12px;max-width:340px}
+    .net-note strong{color:var(--text)}
 
     .why{background:rgba(247,147,26,.06);border:1px solid rgba(247,147,26,.2);
          border-radius:12px;padding:18px 20px;margin:16px 0;font-size:.92em;line-height:1.7}
@@ -107,11 +110,12 @@
     </header>
 
     <div class="card">
-      <div class="label">Bitcoin (BTC)</div>
+      <div class="label">Bitcoin (BTC) · Bitcoin network</div>
       <div class="qr-frame">
         <div id="qr"></div>
       </div>
       <div id="addr" class="addr">PASTE_BTC_ADDRESS_HERE</div>
+      <div class="net-note">⚠ Send on the <strong>Bitcoin (BTC) network only</strong>. Funds sent via another network (BEP20, ERC20, Lightning, etc.) will be lost.</div>
       <button id="copy" class="copy-btn">Copy address</button>
     </div>
 
@@ -136,7 +140,7 @@
 
   <script>
     // ---- CONFIG ----
-    const BTC_ADDRESS = "1HscQjL7qrCqzXsEXpiekgjwEYaodN1NeH";
+    const BTC_ADDRESS = "3F1tsmiXK3Pz4b7sfX6hX9Qo5wqk9DVpS1";
     // ----------------
 
     const qrEl    = document.getElementById("qr");
