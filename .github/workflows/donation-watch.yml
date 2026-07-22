@@ -1,0 +1,44 @@
+name: Donation deposit watch
+
+# Polls the donation BTC address every ~10 min and pings Telegram on new
+# incoming transactions. GitHub may delay scheduled runs under load.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: donation-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore seen-tx state
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: seen.json
+          key: donation-seen-${{ github.run_id }}
+          restore-keys: donation-seen-
+
+      - name: Check for new deposits
+        env:
+          ADDR: 3F1tsmiXK3Pz4b7sfX6hX9Qo5wqk9DVpS1
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HAD_CACHE: ${{ steps.cache.outputs.cache-matched-key != '' }}
+        run: node .github/scripts/donation-watch.mjs
+
+      - name: Save seen-tx state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: seen.json
+          key: donation-seen-${{ github.run_id }}

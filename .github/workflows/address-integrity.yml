@@ -1,0 +1,29 @@
+name: Donation address integrity
+
+# Every ~15 min, fetches the live Support page and verifies the BTC donation
+# address still matches the expected value. Alerts on any mismatch (tamper).
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: address-integrity
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify donation address on live page
+        env:
+          EXPECTED: 3F1tsmiXK3Pz4b7sfX6hX9Qo5wqk9DVpS1
+          PAGE_URL: https://gmsim.ca/support.html
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node .github/scripts/address-integrity.mjs
