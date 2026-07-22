@@ -595,6 +595,9 @@
     function extractEssentials() {
         const result = {
             timestamp: new Date().toISOString(),
+            // Report the extension version so the simulator can prompt the user
+            // to reload an outdated extension (unpacked installs don't auto-update).
+            extVersion: (() => { try { return chrome.runtime.getManifest().version; } catch (_) { return null; } })(),
             miner: {},
             wallet: {},
             discount: {},

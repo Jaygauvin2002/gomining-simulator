@@ -724,6 +724,22 @@ tr.current td { background: rgba(247, 147, 26, 0.1); }
 }
 .sync-dot.live { background: var(--green); animation: blink 2s infinite; }
 .sync-dot.stale { background: var(--red); }
+
+/* Outdated-extension banner — shown when the synced extension reports a
+   version older than the minimum (or none). Self-clears once updated. */
+.gm-ext-update-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 10px 44px 10px 16px; box-sizing: border-box;
+    background: #f5c542; color: #1a1a1a;
+    font-size: 0.9rem; line-height: 1.35; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.gm-ext-update-banner .gm-ext-banner-x {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: #1a1a1a;
+    font-size: 22px; line-height: 1; cursor: pointer; padding: 0 6px;
+}
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* Canvas charts */

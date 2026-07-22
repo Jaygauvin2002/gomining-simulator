@@ -4432,12 +4432,60 @@ function renderCalendar(history, chartEl) {
         // syncs update data + the Connection Pulse pill silently — users don't
         // want a popup every 30 seconds.
         let _firstSyncToastShown = false;
+        // Minimum extension version that includes the farm-power sanity bound.
+        // The extension reports its version in the sync payload (`extVersion`);
+        // anything older — or missing entirely (pre-reporting builds) — means the
+        // user is running a buggy/stale unpacked extension that won't auto-update.
+        const MIN_EXT_VERSION = '2.0';
+        function extVersionOutdated(v) {
+            if (!v) return true; // no version reported → pre-2.0 build
+            const a = String(v).split('.').map(n => parseInt(n, 10) || 0);
+            const b = MIN_EXT_VERSION.split('.').map(n => parseInt(n, 10) || 0);
+            for (let i = 0; i < Math.max(a.length, b.length); i++) {
+                const x = a[i] || 0, y = b[i] || 0;
+                if (x < y) return true;
+                if (x > y) return false;
+            }
+            return false;
+        }
+        function maybeShowExtUpdateBanner(data) {
+            try {
+                const existing = document.getElementById('gm-ext-update-banner');
+                if (!extVersionOutdated(data && data.extVersion)) {
+                    if (existing) existing.remove(); // updated → self-clear
+                    return;
+                }
+                if (sessionStorage.getItem('gm_ext_banner_dismissed') === '1') return;
+                if (existing) return;
+                const bar = document.createElement('div');
+                bar.id = 'gm-ext-update-banner';
+                bar.className = 'gm-ext-update-banner';
+                const span = document.createElement('span');
+                span.textContent = t('ext_update_msg');
+                const x = document.createElement('button');
+                x.type = 'button';
+                x.className = 'gm-ext-banner-x';
+                x.setAttribute('aria-label', 'close');
+                x.textContent = '×';
+                x.addEventListener('click', () => {
+                    sessionStorage.setItem('gm_ext_banner_dismissed', '1');
+                    bar.remove();
+                });
+                bar.appendChild(span);
+                bar.appendChild(x);
+                document.body.appendChild(bar);
+            } catch (e) {}
+        }
+
         function checkAutoSync() {
             try {
                 const raw = localStorage.getItem('gomining_autosync');
                 if (!raw) return;
                 const data = JSON.parse(raw);
                 if (!data || !data.timestamp) return;
+                // Prompt to reload an outdated extension even if the data itself
+                // hasn't changed since last check (runs before the timestamp guard).
+                maybeShowExtUpdateBanner(data);
                 // Only apply if newer than last sync
                 if (state.lastAutoSyncTimestamp === data.timestamp) return;
                 state.lastAutoSyncTimestamp = data.timestamp;
@@ -4788,6 +4836,7 @@ function renderCalendar(history, chartEl) {
                 onboard_btn: 'Get Started', onboard_guide: 'How to install the extension',
                 guide_title: 'Chrome Extension Installation',
                 guide_download: '⬇ Download Extension',
+                ext_update_msg: '⚠ Your GoMining extension is outdated. Open chrome://extensions, click 🔄 on “GoMining Simulator”, then refresh this page — this fixes the farm-power display.',
                 guide_s1: 'Download and <strong>unzip</strong> the file above',
                 guide_s2: 'Open <strong>chrome://extensions/</strong> in your browser',
                 guide_s3: 'Enable <strong>"Developer mode"</strong> (toggle in the top right corner)',
@@ -5022,6 +5071,7 @@ function renderCalendar(history, chartEl) {
                 onboard_btn: 'Commencer', onboard_guide: "Comment installer l'extension",
                 guide_title: "Installation de l'extension Chrome",
                 guide_download: "⬇ Télécharger l'extension",
+                ext_update_msg: '⚠ Ton extension GoMining est obsolète. Va sur chrome://extensions, clique 🔄 sur « GoMining Simulator », puis rafraîchis cette page — ça corrige l\'affichage de la puissance.',
                 guide_s1: 'Téléchargez et <strong>décompressez</strong> le fichier ci-dessus',
                 guide_s2: 'Ouvrez <strong>chrome://extensions/</strong> dans votre navigateur',
                 guide_s3: 'Activez le <strong>"Mode développeur"</strong> (en haut à droite)',
