@@ -45,7 +45,7 @@
                     });
                 }
             } catch(e) {
-                console.warn('[GoMining Extractor] Auto-sync error:', e);
+                console.warn('[GMSim Sync] Auto-sync error:', e);
             }
         }, delay);
     }
@@ -377,7 +377,7 @@
         const toggle = document.createElement('button');
         toggle.id = 'gm-extractor-toggle';
         toggle.innerHTML = '<img src="' + chrome.runtime.getURL('icon-128.png') + '" style="width:30px;height:30px;border-radius:6px;">';
-        toggle.title = 'GoMining Extractor';
+        toggle.title = 'GMSim Sync';
         document.body.appendChild(toggle);
 
         // Panel
@@ -385,7 +385,7 @@
         panel.id = 'gm-extractor-panel';
         panel.innerHTML = `
             <div class="gm-header">
-                <span>GoMining Extractor</span>
+                <span>GMSim Sync</span>
                 <button id="gm-close">×</button>
             </div>
             <div class="gm-body">
@@ -500,7 +500,7 @@
     const logMessages = [];
     function log(msg) {
         logMessages.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
-        console.log('[GoMining Extractor]', msg);
+        console.log('[GMSim Sync]', msg);
     }
 
     // === Observer les changements de page (SPA Angular) ===
@@ -564,7 +564,7 @@
             }
             if (labelledCandidates.length) {
                 const best = Math.max(...labelledCandidates);
-                try { console.log('[GoMining Extractor] DOM power (labelled):', best, 'from', labelledCandidates); } catch {}
+                try { console.log('[GMSim Sync] DOM power (labelled):', best, 'from', labelledCandidates); } catch {}
                 return best;
             }
 
@@ -579,14 +579,14 @@
             }
             if (fallbackCandidates.length) {
                 const best = Math.max(...fallbackCandidates);
-                try { console.log('[GoMining Extractor] DOM power (fallback / largest TH):', best, 'from', fallbackCandidates); } catch {}
+                try { console.log('[GMSim Sync] DOM power (fallback / largest TH):', best, 'from', fallbackCandidates); } catch {}
                 return best;
             }
 
-            try { console.log('[GoMining Extractor] No DOM power match on this page'); } catch {}
+            try { console.log('[GMSim Sync] No DOM power match on this page'); } catch {}
             return null;
         } catch (e) {
-            try { console.log('[GoMining Extractor] DOM scrape error:', e); } catch {}
+            try { console.log('[GMSim Sync] DOM scrape error:', e); } catch {}
             return null;
         }
     }
@@ -653,7 +653,7 @@
                 // on the NFT payload), revert to the trustworthy base sum.
                 const baseSum = sums.power || 0;
                 if (baseSum > 0 && totalPower > baseSum * MAX_POWER_RATIO) {
-                    try { console.log('[GoMining Extractor] Rejecting implausible field sum', totalPower, 'via', powerField, '→ base', baseSum); } catch {}
+                    try { console.log('[GMSim Sync] Rejecting implausible field sum', totalPower, 'via', powerField, '→ base', baseSum); } catch {}
                     totalPower = baseSum;
                     powerField = 'power (bounded)';
                 }
@@ -676,7 +676,7 @@
                     powerSource: 'api',
                     fieldSums: sums              // all field sums (visible in JSON export for debug)
                 };
-                try { console.log('[GoMining Extractor] Power per field:', sums, '→ chosen:', totalPower, 'via', powerField); } catch {}
+                try { console.log('[GMSim Sync] Power per field:', sums, '→ chosen:', totalPower, 'via', powerField); } catch {}
             }
             if (m.url?.includes('/wallet/find-by-user') && m.data?.data?.array) {
                 const gmtW = m.data.data.array.find(w => w.type === 'VIRTUAL_GMT');
@@ -975,13 +975,13 @@
         if (!candidates.length) return null;
         // Prefer the largest plausible — that's typically the farm total
         const best = candidates.reduce((a, b) => b.value > a.value ? b : a);
-        try { console.log('[GoMining Extractor] Global scan candidates:', candidates, '→ chosen:', best, '(ceiling:', ceiling, ')'); } catch {}
+        try { console.log('[GMSim Sync] Global scan candidates:', candidates, '→ chosen:', best, '(ceiling:', ceiling, ')'); } catch {}
         return best.value;
     }
 
     // === Init ===
     createPanel();
-    log('Extension GoMining Extractor démarrée');
+    log('GMSim Sync démarré');
 
     // Auto-scan après 3 secondes
     setTimeout(() => {
