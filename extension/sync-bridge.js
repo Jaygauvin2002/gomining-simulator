@@ -1,5 +1,5 @@
 // GoMining Sync Bridge — Content script for simulator pages
-// Receives push from background worker + polls as fallback
+// Watches chrome.storage for instant updates + polls as a fallback
 
 (function() {
     'use strict';
@@ -55,17 +55,20 @@
         } catch (e) { /* never throw out of the bridge */ }
     }
 
-    // Receive push from background worker (instant) — wrapped for safety
+    // Instant sync — a content script can watch chrome.storage directly, so
+    // the extractor's write reaches us with no round-trip through a service
+    // worker. (The old path went background.js -> chrome.tabs.query({url}) ->
+    // sendMessage, but that query needs the "tabs" permission or a host
+    // permission we don't hold, so it always failed and the push never
+    // arrived — the poll below was doing all the work, up to 15s late.)
     try {
-        chrome.runtime.onMessage.addListener((msg) => {
+        chrome.storage.onChanged.addListener((changes, area) => {
             if (invalidated || !isContextValid()) return;
-            try {
-                if (msg && msg.type === 'GOMINING_SYNC_PUSH' && msg.data) {
-                    writeToLocalStorage(msg.data);
-                }
-            } catch { /* ignore */ }
+            if (area !== 'local' || !changes.gominingAutoSync) return;
+            const data = changes.gominingAutoSync.newValue;
+            if (data) writeToLocalStorage(data);
         });
-    } catch (e) { markInvalidated('onMessage'); }
+    } catch (e) { markInvalidated('storage.onChanged'); }
 
     // Poll fallback — guard against invalidated context every tick
     function syncData() {

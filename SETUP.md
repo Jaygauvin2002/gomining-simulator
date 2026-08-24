@@ -178,3 +178,48 @@ Re-deploy the site (Vercel does it automatically on `git push`). They'll now see
 ---
 
 Questions, or want me to add specific ad placements / a privacy policy page / passwordless email sign-in instead of Google? Just ask.
+
+---
+
+## Extension: testing against a local build
+
+The shipped `extension/manifest.json` is the Chrome Web Store build, so its
+`sync-bridge.js` content script only matches the public origins:
+
+```
+"matches": ["https://gmsim.ca/*", "https://www.gmsim.ca/*", "https://jaygauvin2002.github.io/gomining-preview/*"]
+```
+
+`file:///*` and `http://localhost:*/*` are deliberately absent — `file://`
+access triggers a manual Chrome Web Store review that is hard to justify for a
+public extension, and localhost has no reason to ship to end users.
+
+To sync against a local copy of the simulator while developing, add them back
+to that one `matches` array in your **unpacked** copy:
+
+```
+"matches": ["https://gmsim.ca/*", "https://www.gmsim.ca/*", "https://jaygauvin2002.github.io/gomining-preview/*", "http://localhost:*/*", "file:///*"]
+```
+
+Reload the extension at `chrome://extensions/`, and for `file://` also enable
+"Allow access to file URLs" on its details page. **Revert this before building
+the zip you upload to the store.**
+
+After any change to `extractor.js` or `inject-early.js`, reload the extension
+*and* hard-reload the `app.gomining.com` tab — content scripts do not hot-swap
+into already-open pages.
+
+### Rebuilding extension.zip
+
+From the repo root, flat (no enclosing folder):
+
+```
+rm -f extension.zip
+cd extension && zip -X -q ../extension.zip \
+  extractor.js icon-16.png icon-48.png icon-128.png \
+  inject-early.js interceptor.js manifest.json panel.css sync-bridge.js
+cd ..
+```
+
+Keep it in sync whenever anything under `extension/` changes — `gmsim.ca`
+serves this file directly from the repo as the public download.
