@@ -125,12 +125,18 @@
                       : type === 'GOMINING_SSE'   ? 'sse' : '?';
         const entry = {
             time: new Date().toISOString(),
-            url: ('[' + channel + (wsEvent ? ':'+wsEvent : '') + '] ' + (url || '')).substring(0, 120),
+            url: ('[' + channel + (wsEvent ? ':'+wsEvent : '') + '] ' + (url || '').split('?')[0]).substring(0, 120),
             size: body ? body.length : 0,
             keys: parsed && typeof parsed === 'object' ? Object.keys(parsed).join(', ') : ''
         };
-        DATA.apiCalls.unshift(entry);
-        if (DATA.apiCalls.length > 50) DATA.apiCalls.pop();
+        // Ne journaliser que les endpoints de la liste blanche. Sinon ce
+        // compteur serait un relevé du trafic réseau de la page — quelque
+        // chose qu'il faudrait déclarer comme « activité de l'utilisateur »
+        // au Chrome Web Store, pour un simple indicateur d'interface.
+        if (isStorableUrl(url) || type === 'GOMINING_WS' || type === 'GOMINING_SSE') {
+            DATA.apiCalls.unshift(entry);
+            if (DATA.apiCalls.length > 50) DATA.apiCalls.pop();
+        }
 
         // Storage strategy:
         //   fetch / XHR  → keyed by endpoint pathname (last response wins)
@@ -200,6 +206,27 @@
         }
     }
 
+    // === Liste blanche des endpoints réellement consommés ===
+    // Tout ce qui n'est pas ici n'est jamais stocké. Motivation : le filtrage
+    // par mots-clés d'avant capturait /auth/isAuth-v2 (parce que sa réponse
+    // contient "rewardProtection", "bonusMinerActiveUntil" et "nftPrimaryPfpId"),
+    // ce qui mettait en cache l'e-mail, le téléphone, le statut KYC, l'IP et un
+    // JWT actif — puis les recopiait dans le localStorage de gmsim.ca.
+    // Chaque entrée ci-dessous correspond à une lecture réelle dans
+    // extractEssentials() ou dans le bloc prix.
+    const SOLO_ALLOWLIST = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)\b|\/nft-income\/find-aggregated-by-date|\/nft-income-aggregation\/get-last|\/wallet\/find-by-user|\/get-my-nft-discount|\/user\/get-total-income-values|\/home-page\/get-info|\/ve-gomining-lock\/(find-by-user|statistics)|getTokenPrice/i;
+
+    // Refus explicite, évalué avant la liste blanche. Ceinture et bretelles :
+    // si un endpoint sensible venait un jour à ressembler à un endpoint solo,
+    // il resterait bloqué.
+    const HARD_DENYLIST = /\/auth\/|\/oauth|\/kyc|\/profile|\/i18n\/|\/assets\/|\.json(\?|$)|config\.ton\.org|intercom|\/banner-configuration\/|\/academy\/|\/achievement-template\/|\/loan-api\/|\/notification\/|\/ab-tests\/|\/nft-collection\/index/i;
+
+    function isStorableUrl(url) {
+        const u = url || '';
+        if (HARD_DENYLIST.test(u)) return false;
+        return SOLO_ALLOWLIST.test(u);
+    }
+
     // === Purger les données trop vieilles ===
     function purgeOldData() {
         const cutoff = new Date(Date.now() - MAX_AGE_HOURS * 3600 * 1000).toISOString();
@@ -209,16 +236,29 @@
         // URL substring — not by content — so we don't trip on field names.
         const isMwLeaked = (entry) => /\/nft-game\/|\/clan-leaderboard\/|\/clan\/get-by(-id|-user)|\/round\/(get-state|get-last|find-by-cycleId)|\/rewards-by-user|\/get-total-reward-by-user|\/league\/(index|get-user-positions-data)|\/nft-game-bot|\/nft-game-token|\/nft-game-ability|\/nft-game-income|\/nft-game-user-profile|\/clan-rating|\/clan-message|\/league\/find-many|\/nft-game-round|wss?:\/\/(?:[a-z0-9-]+\.)*gomining\.com/i.test(entry.url || '');
 
-        let leaked = 0;
+        let leaked = 0, offlist = 0;
         for (const key of Object.keys(DATA.miners)) {
             if (isMwLeaked(DATA.miners[key])) { delete DATA.miners[key]; leaked++; continue; }
+            // Évince ce qu'une version antérieure avait mis en cache hors liste
+            // blanche — notamment /auth/isAuth-v2 et ses données personnelles.
+            if (!isStorableUrl(DATA.miners[key].url)) { delete DATA.miners[key]; offlist++; continue; }
             if (DATA.miners[key].time < cutoff) delete DATA.miners[key];
         }
         for (const key of Object.keys(DATA.rewards)) {
             if (isMwLeaked(DATA.rewards[key])) { delete DATA.rewards[key]; leaked++; continue; }
+            if (!isStorableUrl(DATA.rewards[key].url)) { delete DATA.rewards[key]; offlist++; continue; }
             if (DATA.rewards[key].time < cutoff) delete DATA.rewards[key];
         }
         if (leaked) log('Purge MW-leaked from solo pools: ' + leaked);
+        if (offlist) log('Purge hors liste blanche (données héritées): ' + offlist);
+
+        // DATA.prices.raw pouvait retenir n'importe quelle réponse contenant
+        // "price"/"rate"/"usd" — dont le bundle i18n. On ne garde que les
+        // valeurs dérivées si la source n'est plus admissible.
+        if (DATA.prices && DATA.prices.source && !isStorableUrl(DATA.prices.source)) {
+            delete DATA.prices.raw;
+            delete DATA.prices.source;
+        }
 
         // Purger apiCalls vieux
         DATA.apiCalls = DATA.apiCalls.filter(c => c.time > cutoff);
@@ -233,6 +273,9 @@
 
     // === Analyser les réponses API ===
     function analyzeResponse(url, data) {
+        // Rien n'est stocké hors de la liste blanche — voir isStorableUrl().
+        if (!isStorableUrl(url)) return;
+
         // Chercher des patterns de données mining
         const str = JSON.stringify(data).toLowerCase();
 
