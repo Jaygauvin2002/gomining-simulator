@@ -2626,3 +2626,92 @@ body.has-live-footer .main-content { padding-bottom: 64px; }
     .port-add-form { grid-template-columns: 1fr; }
 }
 
+
+/* ===== « Depuis ta dernière visite » ==================================
+   Une note d'information, pas une alerte : elle annonce un mouvement de
+   marché, pas un problème. D'où le vert/ambre discret plutôt que le rouge,
+   et la disparition complète quand il n'y a rien à dire. */
+.gms-welcome-back {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #23303f);
+  border-radius: 10px;
+  background: linear-gradient(180deg,
+              rgba(247, 147, 26, .07),
+              rgba(247, 147, 26, .02));
+}
+.gms-welcome-back[hidden] { display: none; }
+
+.gms-welcome-back .gwb-body { flex: 1; min-width: 0; }
+
+.gms-welcome-back .gwb-lead {
+  margin: 0 0 6px;
+  font-size: .74rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-dim, #8794a6);
+}
+
+.gms-welcome-back .gwb-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gms-welcome-back .gwb-changes li {
+  font-size: 1.02rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #e7ebf1);
+}
+.gms-welcome-back .gwb-changes li.up    { color: var(--green,  #35c77b); }
+.gms-welcome-back .gwb-changes li.down  { color: var(--red,    #e5534b); }
+.gms-welcome-back .gwb-changes li.strat { color: var(--accent, #f7931a); }
+
+.gms-welcome-back .gwb-close {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim, #8794a6);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.gms-welcome-back .gwb-close:hover { color: var(--text, #e7ebf1); }
+.gms-welcome-back .gwb-close:focus-visible {
+  outline: 2px solid var(--accent, #f7931a);
+  outline-offset: 2px;
+}
+
+/* ===== Opt-in alertes dans le menu ⋯ ================================== */
+.tnm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.tnm-toggle input[type="checkbox"] {
+  margin-left: auto;
+  accent-color: var(--accent, #f7931a);
+  cursor: pointer;
+}
+.tnm-note {
+  margin: 4px 0 0;
+  padding: 0 8px;
+  font-size: .72rem;
+  line-height: 1.45;
+  color: var(--text-dim, #8794a6);
+}
+
+@media (max-width: 560px) {
+  .gms-welcome-back .gwb-changes { gap: 6px 12px; }
+  .gms-welcome-back .gwb-changes li { font-size: .95rem; }
+}

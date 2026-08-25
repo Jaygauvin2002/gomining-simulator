@@ -501,6 +501,16 @@
                             <span class="tnm-ico">↻</span> <span data-i18n="refresh">Refresh data</span>
                         </button>
                     </div>
+                    <div class="tnm-section">
+                        <span class="tnm-section-label" data-i18n="alerts_label">Alerts</span>
+                        <label class="tnm-item tnm-toggle" for="opt-strategy-alerts">
+                            <span class="tnm-ico">🔔</span>
+                            <span data-i18n="alerts_optin">Email me when my optimal strategy changes</span>
+                            <input type="checkbox" id="opt-strategy-alerts">
+                        </label>
+                        <p class="tnm-note" data-i18n="alerts_note">Off by default. No other email is ever sent, and you can turn this off here at any time.</p>
+                    </div>
+
                     <div class="tnm-section tnm-langs">
                         <span class="tnm-section-label" data-i18n="language">Language</span>
                         <div class="lang-toggle">
@@ -664,6 +674,16 @@
 
         <!-- TAB: Dashboard (Homepage) -->
         <div class="tab-content active" id="tab-dashboard">
+
+            <!-- « Depuis ta dernière visite » — rendue par le module en bas de page.
+                 Reste absente tant qu'il n'y a rien de neuf à annoncer. -->
+            <aside class="gms-welcome-back" id="gms-welcome-back" hidden>
+                <div class="gwb-body">
+                    <p class="gwb-lead" id="gwb-lead"></p>
+                    <ul class="gwb-changes" id="gwb-changes"></ul>
+                </div>
+                <button type="button" class="gwb-close" id="gwb-close" aria-label="Dismiss">×</button>
+            </aside>
 
             <!-- ===== HERO: Simulation Parameters / Profit Card / Saved Scenarios ===== -->
             <section class="dashboard-hero" id="dashboard-hero">
@@ -2890,6 +2910,9 @@
             const best = strategies.reduce((a, b) => a.val > b.val ? a : b);
 
             const stratEl = document.getElementById('dash-strategy');
+            // Exposé pour la bannière « depuis ta dernière visite » : lire une
+            // valeur plutôt que de reparser le texte du DOM.
+            window.__gmsOptimal = best.key;
             stratEl.textContent = best.key;
             stratEl.style.color = best.color;
 
@@ -4877,6 +4900,12 @@ function renderCalendar(history, chartEl) {
                 reco_at_current_prices: 'At current prices over',
                 sim_cum_profit: 'Cumulative 12-month profit', sim_optimistic: 'Optimistic', sim_pessimistic: 'Pessimistic', sim_final_th: 'Final TH',
                 sync_active: 'Auto-sync active', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync', sync_none: 'No sync', sync_last: 'Last sync', sync_stale: 'Data {n}d old — reopen GoMining to refresh',
+                hist_uptodate: 'Up to date', hist_recent: 'Last solo sync', hist_days_ago: ' days ago',
+                hist_behind_pre: 'Solo history', hist_behind_post: 'd behind',
+                hist_behind_hint: 'Open GoMining\u2019s Rewards page to refresh — or, if you earn through Miner Wars, GMSim does not compute those rewards yet.',
+                wb_lead: 'Since your last visit', wb_days: 'd', wb_strategy: 'Optimal strategy',
+                alerts_label: 'Alerts', alerts_optin: 'Email me when my optimal strategy changes',
+                alerts_note: 'Off by default. No other email is ever sent, and you can turn this off here at any time.',
                 sync_success: 'Data synced from extension!',
                 sync_no_data: 'No GoMining data in clipboard.\n\n1. Go to app.gomining.com\n2. Click "Copy data for Simulator" in the extension panel\n3. Come back here and click "Sync Extension"',
                 sync_clipboard_denied: 'Clipboard access denied.\nClick somewhere on the page first, then try again.',
@@ -5112,6 +5141,12 @@ function renderCalendar(history, chartEl) {
                 reco_at_current_prices: 'Aux prix actuels sur',
                 sim_cum_profit: 'Profit cumulé 12 mois', sim_optimistic: 'Optimiste', sim_pessimistic: 'Pessimiste', sim_final_th: 'TH final',
                 sync_active: 'Auto-sync actif', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync il y a', sync_none: 'Pas de sync', sync_last: 'Dernière sync', sync_stale: 'Données vieilles de {n}j — rouvre GoMining pour rafraîchir',
+                hist_uptodate: 'À jour', hist_recent: 'Dernière sync solo', hist_days_ago: ' jours',
+                hist_behind_pre: 'Historique solo', hist_behind_post: 'j de retard',
+                hist_behind_hint: 'Ouvre la page Rewards de GoMining pour rafraîchir — ou, si tes gains passent par Miner Wars, GMSim ne calcule pas encore ces revenus.',
+                wb_lead: 'Depuis ta dernière visite', wb_days: 'j', wb_strategy: 'Stratégie optimale',
+                alerts_label: 'Alertes', alerts_optin: 'Préviens-moi par courriel quand ma stratégie optimale change',
+                alerts_note: 'Désactivé par défaut. Aucun autre courriel n\u2019est envoyé, et tu peux le couper ici quand tu veux.',
                 sync_success: "Données synchronisées depuis l'extension !",
                 sync_no_data: "Aucune donnée GoMining dans le presse-papier.\n\n1. Va sur app.gomining.com\n2. Clique \"Copier données pour Simulateur\" dans le panel de l'extension\n3. Reviens ici et clique \"Sync Extension\"",
                 sync_clipboard_denied: "Accès au presse-papier refusé.\nClique d'abord quelque part sur la page, puis réessaie.",
@@ -6367,11 +6402,21 @@ function renderCalendar(history, chartEl) {
                     const days = Math.max(0, Math.round(
                         (new Date(today) - new Date(latest)) / (24 * 3600 * 1000)
                     ));
-                    let label, klass;
-                    if (days <= 1)      { label = 'Up to date · ' + latest;             klass = 'fresh'; }
-                    else if (days <= 3) { label = 'Last sync: ' + days + ' days ago';   klass = 'warn'; }
-                    else                { label = '⚠ ' + days + ' days behind — re-sync needed'; klass = 'stale'; }
+                    // Un historique solo figé n'est pas forcément une panne : les
+                    // joueurs Miner Wars gagnent par un autre canal, que GMSim ne
+                    // calcule pas encore. Dire « re-sync needed » leur faisait
+                    // croire que l'outil était cassé.
+                    const tt = (k, fb) => (typeof t === 'function' ? (t(k) || fb) : fb);
+                    let label, klass, hint = '';
+                    if (days <= 1)      { label = tt('hist_uptodate','Up to date') + ' · ' + latest; klass = 'fresh'; }
+                    else if (days <= 3) { label = tt('hist_recent','Last solo sync') + ': ' + days + tt('hist_days_ago',' days ago'); klass = 'warn'; }
+                    else {
+                        label = '⚠ ' + tt('hist_behind_pre','Solo history') + ' ' + days + tt('hist_behind_post','d behind');
+                        klass = 'warn';
+                        hint  = tt('hist_behind_hint','Open GoMining\u2019s Rewards page to refresh — or, if you earn through Miner Wars, GMSim does not compute those rewards yet.');
+                    }
                     stalePill.textContent = label;
+                    stalePill.title = hint;
                     stalePill.className = 'dh-history-staleness ' + klass;
                     stalePill.style.display = '';
                 } else {
@@ -6657,6 +6702,107 @@ function renderCalendar(history, chartEl) {
         const observer = new MutationObserver(reflectAppVisibility);
         const appRoot = document.getElementById('app-root');
         if (appRoot) observer.observe(appRoot, { attributes: true, attributeFilter: ['style'] });
+    })();
+    </script>
+    <script>
+    // ===== « Depuis ta dernière visite » + opt-in alertes ==================
+    // Deux petites choses, volontairement sans dépendance :
+    //   1. Au retour, dire ce qui a bougé depuis la dernière session — c'est la
+    //      raison de revenir la plus honnête qu'on ait : le prix du BTC et la
+    //      stratégie optimale changent tout seuls, sans qu'on ait rien à vendre.
+    //   2. Recueillir un consentement propre pour l'alerte par courriel. Rien
+    //      n'est envoyé aujourd'hui : on commence à construire la permission
+    //      maintenant pour ne jamais avoir à écrire à une liste froide.
+    (function () {
+        'use strict';
+
+        var VISIT_KEY = 'gms_last_visit';
+        var OPTIN_KEY = 'gms_strategy_alerts';
+        var MIN_GAP_H = 20;      // ne rien montrer deux fois dans la même journée
+        var MIN_MOVE  = 3;       // variation BTC en % à partir de laquelle ça vaut le détour
+
+        function tr(k, fb) { try { return (typeof t === 'function' && t(k)) || fb; } catch (e) { return fb; } }
+        function read(k)   { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+        function write(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+        // ---------- opt-in ----------
+        var box = document.getElementById('opt-strategy-alerts');
+        if (box) {
+            var saved = read(OPTIN_KEY);
+            box.checked = saved === true;
+            box.addEventListener('change', function () {
+                write(OPTIN_KEY, box.checked);
+                // Rattaché au compte s'il y en a un, pour que le consentement
+                // survive au navigateur et soit vérifiable côté serveur.
+                try {
+                    if (window.saveUserSettings) window.saveUserSettings({ strategyAlerts: box.checked });
+                } catch (e) {}
+            });
+        }
+
+        // ---------- bannière de retour ----------
+        var el = document.getElementById('gms-welcome-back');
+        if (!el) return;
+
+        document.getElementById('gwb-close').addEventListener('click', function () {
+            el.hidden = true;
+        });
+
+        function snapshot() {
+            var btc = (window.state && window.state.btcPrice) || 0;
+            var strat = window.__gmsOptimal || null;
+            if (!btc || !strat) return null;
+            return { t: new Date().toISOString(), btc: btc, strat: strat };
+        }
+
+        function render(prev, now) {
+            var hours = (new Date(now.t) - new Date(prev.t)) / 3600000;
+            if (!isFinite(hours) || hours < MIN_GAP_H) return false;
+
+            var movePct = prev.btc ? ((now.btc - prev.btc) / prev.btc) * 100 : 0;
+            var moved = Math.abs(movePct) >= MIN_MOVE;
+            var switched = prev.strat && now.strat && prev.strat !== now.strat;
+            if (!moved && !switched) return false;
+
+            var days = Math.max(1, Math.round(hours / 24));
+            document.getElementById('gwb-lead').textContent =
+                tr('wb_lead', 'Since your last visit') + ' · ' + days + tr('wb_days', 'd');
+
+            var list = document.getElementById('gwb-changes');
+            list.textContent = '';
+
+            if (moved) {
+                var li = document.createElement('li');
+                li.className = movePct >= 0 ? 'up' : 'down';
+                li.textContent = 'Bitcoin ' + (movePct >= 0 ? '+' : '') + movePct.toFixed(1) + '%';
+                list.appendChild(li);
+            }
+            if (switched) {
+                var li2 = document.createElement('li');
+                li2.className = 'strat';
+                li2.textContent = tr('wb_strategy', 'Optimal strategy') + ' : ' +
+                                  prev.strat + ' \u2192 ' + now.strat;
+                list.appendChild(li2);
+            }
+            el.hidden = false;
+            return true;
+        }
+
+        // Les données arrivent de façon asynchrone (extension, API, cache).
+        // On attend qu'elles se posent, puis on compare une seule fois.
+        var prev = read(VISIT_KEY);
+        var tries = 0;
+        var timer = setInterval(function () {
+            var now = snapshot();
+            tries++;
+            if (now) {
+                clearInterval(timer);
+                if (prev && prev.btc && prev.strat) render(prev, now);
+                write(VISIT_KEY, now);   // l'instantané de cette visite devient la référence
+            } else if (tries > 40) {     // ~20 s : pas de données, on ne touche à rien
+                clearInterval(timer);
+            }
+        }, 500);
     })();
     </script>
 </body>
