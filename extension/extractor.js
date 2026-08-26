@@ -1122,22 +1122,39 @@
         //     than what we summed per-NFT, prefer it — the user-facing
         //     UI almost always pulls from such a dedicated total endpoint
         //     when it exists.
-        const anchor = result.miner.apiPower || 0; // base Σ(n.power) — the reliable reference
-        const globalPower = findFarmTotalAcrossResponses(result.miner.power || 0);
-        if (globalPower != null && globalPower > (result.miner.power || 0)
-            && isPlausibleFarmPower(globalPower, anchor)) {
-            result.miner.power = globalPower;
-            result.miner.powerSource = 'global-scan';
-        }
+        const anchor = result.miner.apiPower || 0; // base Σ(n.power)
 
-        // === Final override: visible DOM value ===
-        // If the Mining-farm widget is rendered on the current page, what
-        // the user *sees* is the canonical source — trumps API/global scan.
-        const domPower = scanFarmPowerFromDom();
-        if (domPower != null && domPower > 0
-            && isPlausibleFarmPower(domPower, anchor)) {
-            result.miner.power = domPower;
-            result.miner.powerSource = 'dom';
+        // Σ(n.power) issu de /nft/get-my fait FOI quand il existe.
+        //
+        // Ces deux couches d'écrasement avaient été ajoutées pour combler un
+        // écart de 0,6 % (333,27 sommés contre 335,43 affichés). Elles ont
+        // depuis produit trois pannes bien pires que le défaut qu'elles
+        // corrigeaient : une ferme annoncée à 2 000 000 TH, une autre rabattue
+        // à 10 000 par la validation du site, et — confirmé par Jérémie le
+        // 2026-08-26 — 998,63 TH affichés pour une ferme réelle de 696,42, soit
+        // 43 % d'erreur sur laquelle reposaient gain quotidien, profit et sat/TH.
+        //
+        // Le garde-fou ne pouvait rien y faire : il tolère jusqu'à 3× la base,
+        // et 998 < 3 × 696. Aucun réglage de seuil ne distingue une valeur
+        // fausse d'une valeur haute — seule la source le peut.
+        //
+        // Les couches restent donc en place UNIQUEMENT pour les utilisateurs
+        // dont /nft/get-my n'a pas été capté : sans elles, ils n'auraient aucune
+        // puissance du tout. Dès que l'API a parlé, on l'écoute.
+        if (!anchor) {
+            const globalPower = findFarmTotalAcrossResponses(result.miner.power || 0);
+            if (globalPower != null && globalPower > (result.miner.power || 0)
+                && isPlausibleFarmPower(globalPower, anchor)) {
+                result.miner.power = globalPower;
+                result.miner.powerSource = 'global-scan (aucun /nft/get-my capté)';
+            }
+
+            const domPower = scanFarmPowerFromDom();
+            if (domPower != null && domPower > 0
+                && isPlausibleFarmPower(domPower, anchor)) {
+                result.miner.power = domPower;
+                result.miner.powerSource = 'dom (aucun /nft/get-my capté)';
+            }
         }
 
         return result;
