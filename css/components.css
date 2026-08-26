@@ -2761,3 +2761,23 @@ body.has-live-footer .main-content { padding-bottom: 64px; }
   letter-spacing: 0;
   white-space: nowrap;
 }
+
+/* Lignes issues du relevé GoMining : lecture seule. Le liseré les distingue des
+   saisies manuelles sans les reléguer — ce sont les plus nombreuses et les plus
+   fiables, elles ne doivent pas avoir l'air secondaires. */
+tr.tx-auto td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent, #f7931a);
+}
+.tx-auto-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-size: .62em;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent, #f7931a);
+  border: 1px solid currentColor;
+  vertical-align: middle;
+}

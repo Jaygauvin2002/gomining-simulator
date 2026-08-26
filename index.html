@@ -5108,6 +5108,8 @@ function renderCalendar(history, chartEl) {
                 port_bd_ledger: 'Filled in from your GoMining transactions — nothing to enter by hand. Percentages are shares of what you spent; deposits are the capital it came from. Manual entries stay in the table below and are not counted twice.',
                 port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
                 port_bd_no_cats: 'captured before categorisation existed — reload the extension',
+                tx_auto: 'auto', tx_count_label: 'transactions',
+                tx_from_gomining: 'from GoMining', tx_manual: 'entered by hand',
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
                 port_need_deposit: 'Add a Deposit entry — only money from outside counts as capital.',
                 port_capital_fallback: 'Estimated from purchases. Log your deposits for an exact figure.',
@@ -5374,6 +5376,8 @@ function renderCalendar(history, chartEl) {
                 port_bd_ledger: 'Rempli depuis tes transactions GoMining — rien à saisir. Les pourcentages sont des parts de ce que tu as dépensé ; les dépôts sont le capital d\'où ça vient. Tes lignes manuelles restent dans la table et ne sont pas comptées deux fois.',
                 port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
                 port_bd_no_cats: 'capturé avant la catégorisation — recharge l\'extension',
+                tx_auto: 'auto', tx_count_label: 'transactions',
+                tx_from_gomining: 'depuis GoMining', tx_manual: 'saisies à la main',
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
                 port_need_deposit: 'Ajoute une ligne Dépôt — seul l\'argent venu de l\'extérieur compte comme capital.',
                 port_capital_fallback: 'Estimé d\'après tes achats. Saisis tes dépôts pour un chiffre exact.',
@@ -6123,13 +6127,31 @@ function renderCalendar(history, chartEl) {
             // Transaction table with filters
             const filterCat = document.getElementById('tx-filter-cat')?.value || 'all';
             const filterSearch = (document.getElementById('tx-filter-search')?.value || '').toLowerCase();
-            let filteredTxs = [...txs].reverse();
+
+            // Les mouvements du relevé GoMining rejoignent la table, en lecture
+            // seule. Ils ne sont ni supprimables ni modifiables : ce sont un miroir
+            // de GoMining, les effacer n'aurait aucun sens puisqu'ils reviendraient
+            // à la synchro suivante. Les lignes saisies à la main restent
+            // modifiables et se distinguent visuellement.
+            const ledgerTxs = (state.capital?.transactions || []).map(x => ({
+                date: x.date,
+                category: x.category,
+                amount: (x.gmt != null && gmtP) ? x.gmt * gmtP : 0,
+                gmtAmount: x.gmt != null ? x.gmt : null,
+                note: (x.gmt == null && x.currency)
+                    ? `${x.amount.toFixed(4)} ${x.currency}` : '',
+                auto: true,
+                _id: x.id,
+            }));
+            const allTxs = [...txs, ...ledgerTxs]
+                .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+            let filteredTxs = allTxs;
             if (filterCat !== 'all') filteredTxs = filteredTxs.filter(tx => tx.category === filterCat);
             if (filterSearch) filteredTxs = filteredTxs.filter(tx => (tx.note || '').toLowerCase().includes(filterSearch) || (tx.category || '').toLowerCase().includes(filterSearch));
 
             let tHtml = '';
             const catMeta = getCatMeta();
-            if (txs.length === 0) {
+            if (allTxs.length === 0) {
                 tHtml = `<div style="text-align:center;padding:32px 20px;color:var(--text-dim);">
                     <div style="font-size:2.2em;margin-bottom:10px;opacity:0.6;">📒</div>
                     <div style="margin-bottom:6px;font-weight:600;color:var(--text);">${t('tx_no_transactions')}</div>
@@ -6144,17 +6166,23 @@ function renderCalendar(history, chartEl) {
                 tHtml = `<table><thead><tr><th>Date</th><th>${t('tx_category')}</th><th>${t('lbl_amount')}</th><th>TH</th><th>${t('lbl_note')}</th><th></th></tr></thead><tbody>`;
                 filteredTxs.forEach(tx => {
                     const meta = catMeta[tx.category] || { icon: '?', label: tx.category };
-                    tHtml += `<tr>
+                    tHtml += `<tr${tx.auto ? ' class="tx-auto"' : ''}>
                         <td>${tx.date}</td>
-                        <td>${meta.icon} ${meta.label}</td>
+                        <td>${meta.icon} ${meta.label}${tx.auto ? ` <span class="tx-auto-badge">${t('tx_auto')}</span>` : ''}</td>
                         <td style="font-weight:700;">${formatUSD(tx.amount)}${tx.gmtAmount ? `<div style="font-size:0.72em;color:var(--purple);">${tx.gmtAmount.toFixed(1)} GMT</div>` : ''}</td>
                         <td style="color:var(--green);font-weight:600;">${tx.th ? '+' + tx.th + ' TH' : ''}</td>
                         <td style="color:var(--text-dim);font-size:0.85em;">${tx.note || ''}</td>
-                        <td><button type="button" aria-label="Delete transaction" title="Delete transaction" style="background:transparent;border:none;cursor:pointer;color:var(--red);font-size:0.9em;padding:4px 6px;" onclick="deleteTransaction(${tx.id})">✕</button></td>
+                        <td>${tx.auto ? '' : `<button type="button" aria-label="Delete transaction" title="Delete transaction" style="background:transparent;border:none;cursor:pointer;color:var(--red);font-size:0.9em;padding:4px 6px;" onclick="deleteTransaction(${tx.id})">✕</button>`}</td>
                     </tr>`;
                 });
                 tHtml += '</tbody></table>';
-                tHtml += `<div style="font-size:0.75em;color:var(--text-dim);margin-top:6px;">${filteredTxs.length} / ${txs.length} transactions</div>`;
+                // Distinguer les deux origines dans le compte : sinon on ne sait
+                // plus ce qui vient de GoMining et ce qu'on a saisi soi-même.
+                const nAuto = allTxs.filter(x => x.auto).length;
+                const nManual = allTxs.length - nAuto;
+                tHtml += `<div style="font-size:0.75em;color:var(--text-dim);margin-top:6px;">${
+                    filteredTxs.length} / ${allTxs.length} ${t('tx_count_label')}${
+                    nAuto > 0 ? ` · ${nAuto} ${t('tx_from_gomining')}${nManual > 0 ? `, ${nManual} ${t('tx_manual')}` : ''}` : ''}</div>`;
             }
             document.getElementById('port-transactions').innerHTML = tHtml;
         }

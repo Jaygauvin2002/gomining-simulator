@@ -488,6 +488,12 @@
         // au hasard — même règle que pour le capital.
         const byCategory = {};
         const catUnvalued = {};
+        // Liste détaillée, pour que le simulateur puisse afficher l'historique
+        // plutôt que seulement des totaux. On ne transmet QUE les mouvements
+        // catégorisés — pas le relevé brut : les conversions de devise, les revenus
+        // et les paiements internes n'ont rien à faire dans un journal
+        // d'investissement, et moins on en recopie, mieux c'est.
+        const items = [];
         for (const t of txs) {
             const cat = SPEND_CATEGORY[String(t.fromType || '').toLowerCase()];
             if (!cat) continue;
@@ -495,16 +501,28 @@
             if (v <= 0) continue;
             const entry = byCategory[cat] || (byCategory[cat] = { gmt: 0, txCount: 0 });
             entry.txCount++;
-            if (c === 'GMT') entry.gmt += v;
-            else if (rates[c]) entry.gmt += v * rates[c];
+            let gmtValue = null;
+            if (c === 'GMT') gmtValue = v;
+            else if (rates[c]) gmtValue = v * rates[c];
+            if (gmtValue !== null) entry.gmt += gmtValue;
             else catUnvalued[c] = (catUnvalued[c] || 0) + v;
+            items.push({
+                id: t.id,
+                date: String(t.createdAt || '').substring(0, 10),
+                category: cat,
+                gmt: gmtValue,        // null si la devise n'a pas de taux mesuré
+                amount: v,
+                currency: c,
+            });
         }
+        items.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
         return {
             source: 'transaction-history',
             txCount: txs.length,
             byCategory: byCategory,
             categoryUnvalued: catUnvalued,
+            transactions: items,
             deposits: deposits,
             rates: rates,
             unvalued: unvalued,
