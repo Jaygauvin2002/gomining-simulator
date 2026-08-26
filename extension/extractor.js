@@ -1088,6 +1088,24 @@
                 result.prices.gmtPrice = r.data.data.currentGmtPrice;
                 result.prices.btcPrice = r.data.data.currentBtcPrice;
             }
+            // Totaux À VIE tenus par GoMining. Le simulateur calculait ses « gains
+            // cumulés » depuis son propre journal de performance, qui ne couvre que
+            // les jours où l'utilisateur a ouvert le site — et repart de zéro à
+            // chaque invalidation de version. Ces totaux-ci sont exhaustifs, et ils
+            // incluent les revenus Miner Wars, invisibles par ailleurs.
+            if (r.url?.includes('/user/get-total-income-values') && r.data?.data) {
+                const v = r.data.data;
+                const num = (x) => (typeof x === 'number' && isFinite(x)) ? x : 0;
+                const solo = num(v.totalExportedReinvestedNftIncome) + num(v.totalExportedNotReinvestedNftIncome);
+                const mw   = num(v.totalExportedReinvestedNftGameIncome) + num(v.totalExportedNotReinvestedNftGameIncome);
+                const bal  = num(v.totalSaveToBalanceNftIncome) + num(v.totalSaveToBalanceNftGameIncome)
+                           + num(v.totalSaveToBalanceIncome) + num(v.totalExportedNotReinvestedIncome);
+                const total = solo + mw + bal;
+                if (total > 0) {
+                    result.income.lifetime = { btc: total, soloBtc: solo, minerWarsBtc: mw, balanceBtc: bal };
+                }
+            }
+
             if (r.url?.includes('/nft-income-aggregation/get-last') && r.data?.data) {
                 // totalIncomePerThToday is partial-day (resets at UTC midnight),
                 // so it keeps "dropping" as UTC days roll over. Stash it as a last-resort

@@ -1540,6 +1540,7 @@
                 <div class="port-kpi">
                     <div class="port-kpi-label" data-i18n="port_cumulative">Cumulative Gains</div>
                     <div class="port-kpi-value" id="port-cumulative" style="color:var(--green);">--</div>
+                    <div class="port-kpi-sub" id="port-cumulative-sub"></div>
                 </div>
                 <div class="port-kpi">
                     <div class="port-kpi-label" data-i18n="port_active_days">Active Days</div>
@@ -3453,6 +3454,11 @@
             // C'était le dernier paramètre laissé à la saisie manuelle, et une
             // valeur erronée y pèse lourd — $0,06 au lieu de $0,05 retirait 20 %
             // sur la moitié des frais, soit $2,30/jour sur cette ferme.
+            // Gains à vie, tenus par GoMining — Miner Wars compris.
+            if (data.income?.lifetime?.btc > 0) {
+                state.lifetimeIncome = data.income.lifetime;
+                try { localStorage.setItem('gms_lifetime_income', JSON.stringify(data.income.lifetime)); } catch (e) {}
+            }
             if (data.income?.elecCostKwh > 0) {
                 const el = document.getElementById('elec-cost');
                 if (el) el.value = data.income.elecCostKwh;
@@ -5038,6 +5044,10 @@ function renderCalendar(history, chartEl) {
                 cat_deposit: '💵 Deposit (money in)',
                 port_recovered_label: 'Recovered',
                 port_cost_per_th: 'Cost / TH',
+                port_cum_lifetime: 'Lifetime, from GoMining\'s own totals',
+                port_cum_lifetime_mw: 'Lifetime, GoMining\'s totals — includes {mw} from Miner Wars',
+                port_cum_measured: 'Over the days this site was open',
+                port_cum_estimate: 'Estimated from the current daily rate',
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
                 port_need_deposit: 'Add a Deposit entry — only money from outside counts as capital.',
                 port_capital_fallback: 'Estimated from purchases. Log your deposits for an exact figure.',
@@ -5294,6 +5304,10 @@ function renderCalendar(history, chartEl) {
                 cat_deposit: '💵 Dépôt (argent entrant)',
                 port_recovered_label: 'Récupéré',
                 port_cost_per_th: 'Coût / TH',
+                port_cum_lifetime: 'Depuis le début, d\'après les totaux de GoMining',
+                port_cum_lifetime_mw: 'Depuis le début, totaux GoMining — dont {mw} de Miner Wars',
+                port_cum_measured: 'Sur les jours où ce site a été ouvert',
+                port_cum_estimate: 'Estimé d\'après le rythme quotidien actuel',
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
                 port_need_deposit: 'Ajoute une ligne Dépôt — seul l\'argent venu de l\'extérieur compte comme capital.',
                 port_capital_fallback: 'Estimé d\'après tes achats. Saisis tes dépôts pour un chiffre exact.',
@@ -5770,19 +5784,31 @@ function renderCalendar(history, chartEl) {
             const firstDate = candidates.length > 0 ? new Date(Math.min(...candidates)) : new Date();
             const days = Math.max(1, Math.round((new Date() - firstDate) / 86400000));
 
-            // Cumulative gains from performance data
-            const perf = loadPerformance();
-            let cumUsd = 0;
-            perf.forEach(p => { cumUsd += p.actual?.valueUsd || 0; });
-
-            // If no perf data, estimate from current rate
+            // Gains cumulés — priorité aux totaux À VIE de GoMining.
+            //
+            // L'ancien calcul sommait notre propre journal de performance, qui ne
+            // couvre que les jours où le site a été ouvert et repart de zéro à
+            // chaque invalidation de version : il affichait $27 là où le vrai
+            // cumul est de $704. Les totaux de GoMining sont exhaustifs et
+            // incluent les revenus Miner Wars, que le simulateur ne modélise pas.
             let currentDailyUsd = 0;
             if (state.lastCalc) {
                 const c = state.lastCalc;
                 const r = calcDailyReward(c.hashrate, c.efficiency, c.elecCost, c.discount, state.btcPrice, c.satPerTH);
                 if (r) currentDailyUsd = r.netUsd;
             }
-            if (cumUsd === 0 && currentDailyUsd > 0) cumUsd = currentDailyUsd * days;
+
+            let cumUsd = 0;
+            let cumSource = 'none';
+            if (state.lifetimeIncome?.btc > 0 && state.btcPrice) {
+                cumUsd = state.lifetimeIncome.btc * state.btcPrice;
+                cumSource = 'lifetime';
+            } else {
+                const perf = loadPerformance();
+                perf.forEach(p => { cumUsd += p.actual?.valueUsd || 0; });
+                if (cumUsd > 0) cumSource = 'perf';
+                if (cumUsd === 0 && currentDailyUsd > 0) { cumUsd = currentDailyUsd * days; cumSource = 'estimate'; }
+            }
 
             // === P&L : modèle « frontière » ===
             //
@@ -5822,12 +5848,33 @@ function renderCalendar(history, chartEl) {
             // c'est du profit. Plus lisible qu'un ROI centré sur zéro pour une
             // position que l'on détient toujours.
             const recovery = capital > 0 ? ((assetValue + withdrawn) / capital * 100) : null;
-            const dailyAvg = cumUsd / days;
+            // La moyenne doit porter sur la même période que le cumul. Diviser un
+            // cumul à vie par l'ancienneté est juste ; diviser trois jours de
+            // journal par 370 jours d'ancienneté donnait $0,07, un chiffre qui ne
+            // décrit rien.
+            const avgDays = (cumSource === 'lifetime' || cumSource === 'estimate')
+                ? days
+                : Math.max(1, loadPerformance().length);
+            const dailyAvg = cumUsd / avgDays;
 
             // KPIs
             document.getElementById('port-total-invested').textContent =
                 capital > 0 ? formatUSD(capital) : '--';
             document.getElementById('port-cumulative').textContent = formatUSD(cumUsd);
+            const cumSub = document.getElementById('port-cumulative-sub');
+            if (cumSub) {
+                // Dire d'où vient le chiffre : un cumul « à vie » et une estimation
+                // à partir du rythme actuel ne se lisent pas de la même façon.
+                const mw = state.lifetimeIncome?.minerWarsBtc;
+                cumSub.textContent =
+                      cumSource === 'lifetime' ? (mw > 0
+                          ? t('port_cum_lifetime_mw').replace('{mw}', formatUSD(mw * state.btcPrice))
+                          : t('port_cum_lifetime'))
+                    : cumSource === 'perf'     ? t('port_cum_measured')
+                    : cumSource === 'estimate' ? t('port_cum_estimate')
+                    : '';
+                cumSub.style.display = cumSub.textContent ? '' : 'none';
+            }
 
             const pnlEl = document.getElementById('port-pnl');
             const roiEl = document.getElementById('port-roi');
@@ -6143,6 +6190,7 @@ function renderCalendar(history, chartEl) {
         // Load persisted reward history before first sync
         state.rewardHistory = loadRewardHistory();
         state.capital = loadCapital();   // survit à la purge 24 h de l'extension
+        try { state.lifetimeIncome = JSON.parse(localStorage.getItem('gms_lifetime_income')) || null; } catch (e) {}
         if (state.rewardHistory.length > 0) {
             document.getElementById('dash-history-section').style.display = 'block';
             showDashboardCalendar(state.rewardHistory);

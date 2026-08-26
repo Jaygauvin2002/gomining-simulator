@@ -2742,3 +2742,12 @@ body.has-live-footer .main-content { padding-bottom: 64px; }
   color: var(--warn, #e0a342);
   max-width: 34ch;
 }
+
+/* Provenance sous les gains cumulés : un cumul à vie et une estimation ne se
+   lisent pas de la même façon, le chiffre seul ne le dit pas. */
+.port-kpi-sub {
+  margin-top: 4px;
+  font-size: .68rem;
+  line-height: 1.35;
+  color: var(--text-dim, #8794a6);
+}
