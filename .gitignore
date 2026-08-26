@@ -10,4 +10,7 @@ Passeport*
 *.docx
 /private/
 /legal/
-
+# Artéfact de build, plus servi publiquement : depuis le 2026-08-26 l'extension
+# se distribue uniquement par le Chrome Web Store. build-zip.sh le produit
+# localement pour le téléversement, il n'a plus à être versionné ni déployé.
+extension.zip

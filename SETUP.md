@@ -226,5 +226,7 @@ upload.
 `node extension/tests/routing.test.mjs` also fails if the zip carries a
 `DEV` name, or if its version has drifted from the manifest.
 
-Keep the zip in sync whenever anything under `extension/` changes —
-`gmsim.ca` still serves this file directly as a fallback download.
+The zip is a **local build artifact only**. Since 2026-08-26 the extension is
+distributed exclusively through the Chrome Web Store: `extension.zip` is
+gitignored, no longer deployed, and no longer linked from anywhere on the
+site. Build it when you need to upload a new version, and nothing else.

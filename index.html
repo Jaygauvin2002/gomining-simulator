@@ -4533,6 +4533,15 @@ function renderCalendar(history, chartEl) {
         // so this banner is now a migration path: it points them at the Chrome
         // Web Store listing, where updates arrive on their own, and it clears
         // itself the moment a 2.4+ build reports in.
+        // ATTENTION AU TIMING. Ce seuil doit passer à '3.5' UNE FOIS que le store
+        // sert bien la 3.5, pas avant : pendant l'examen de Google le store est
+        // encore sur 2.4, et un seuil à 3.5 enverrait les utilisateurs de la 2.4
+        // vers une fiche qui leur propose... la 2.4. Message sans issue.
+        //
+        // Une fois la 3.5 en ligne, mettre '3.5' : tout ce qui est en dessous est
+        // soit une installation manuelle — le public visé, puisque le
+        // téléchargement direct est retiré — soit une mise à jour automatique qui
+        // n'a pas encore atterri, ce qui se règle en quelques heures.
         const MIN_EXT_VERSION = '2.4';
         const EXT_STORE_URL = 'https://chromewebstore.google.com/detail/gmsim-%E2%80%94-miner-sync/llchhkfpkjbkiabpofbpfilicpbnihhp';
         function extVersionOutdated(v) {
@@ -4941,7 +4950,7 @@ function renderCalendar(history, chartEl) {
                 onboard_btn: 'Get Started', onboard_guide: 'How to install the extension',
                 guide_title: 'Chrome Extension Installation',
                 guide_download: '⬇ Download Extension',
-                ext_update_msg: '⚠ Your GMSim extension is out of date and will not update on its own. The Chrome Web Store version updates automatically — and this build no longer keeps a copy of your GoMining sign-in data.',
+                ext_update_msg: '⚠ Your GMSim extension was installed by hand and will never update itself. Reinstall it from the Chrome Web Store: it updates on its own, it no longer keeps a copy of your GoMining sign-in data, and it fixes farm power, reward dates and the daily profit figure. The manual download has been retired.',
                 ext_update_cta: 'Install from the Chrome Web Store →',
                 guide_s1: 'Download and <strong>unzip</strong> the file above',
                 guide_s2: 'Open <strong>chrome://extensions/</strong> in your browser',
@@ -5197,7 +5206,7 @@ function renderCalendar(history, chartEl) {
                 onboard_btn: 'Commencer', onboard_guide: "Comment installer l'extension",
                 guide_title: "Installation de l'extension Chrome",
                 guide_download: "⬇ Télécharger l'extension",
-                ext_update_msg: '⚠ Ton extension GMSim est obsolète et ne se mettra pas à jour toute seule. La version du Chrome Web Store se met à jour automatiquement — et elle ne conserve plus de copie de tes données de connexion GoMining.',
+                ext_update_msg: '⚠ Ton extension GMSim a été installée à la main et ne se mettra jamais à jour. Réinstalle-la depuis le Chrome Web Store : elle se met à jour toute seule, elle ne conserve plus de copie de tes données de connexion GoMining, et elle corrige la puissance de ferme, les dates de récompenses et le profit quotidien. Le téléchargement manuel a été retiré.',
                 ext_update_cta: 'Installer depuis le Chrome Web Store →',
                 guide_s1: 'Téléchargez et <strong>décompressez</strong> le fichier ci-dessus',
                 guide_s2: 'Ouvrez <strong>chrome://extensions/</strong> dans votre navigateur',
