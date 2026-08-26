@@ -1529,8 +1529,8 @@
                         </div>
                     </div>
                     <div class="port-stat port-stat--asset">
-                        <div class="port-stat-label" data-i18n="port_asset_value">Asset Value</div>
-                        <div class="port-stat-value" id="port-asset-value">--</div>
+                        <div class="port-stat-label" data-i18n="port_asset_value">Replacement Value</div>
+                        <div class="port-stat-value" id="port-asset-value" data-i18n-title="port_asset_hint" title="TH valued at the in-app upgrade rate — the cost to rebuild your farm today, not a resale quote. Plus your locked and liquid balances.">--</div>
                     </div>
                 </div>
             </div>
@@ -4858,7 +4858,7 @@ function renderCalendar(history, chartEl) {
                 port_total_invested: 'External Capital', port_cumulative: 'Cumulative Gains',
                 port_pnl: 'Profit / Loss', port_roi_label: 'ROI',
                 port_active_days: 'Active Days', port_daily_avg: 'Avg Gain / Day',
-                port_payback: 'Investment Payback', port_asset_value: 'Asset Value', port_paid_back: 'Paid Back!',
+                port_payback: 'Investment Payback', port_asset_value: 'Replacement Value', port_paid_back: 'Paid Back!',
                 // Labels
                 lbl_breakeven: 'Breakeven BTC', lbl_daily_fees: 'Daily Fees',
                 lbl_objective: 'Objective $', lbl_today_label: 'today',
@@ -4919,6 +4919,7 @@ function renderCalendar(history, chartEl) {
                 cat_deposit: '💵 Deposit (money in)',
                 port_recovered_label: 'Recovered',
                 port_cost_per_th: 'Cost / TH',
+                port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
                 port_need_deposit: 'Add a Deposit entry — only money from outside counts as capital.',
                 port_capital_fallback: 'Estimated from purchases. Log your deposits for an exact figure.',
                 guide_store_cta: 'Install from the Chrome Web Store',
@@ -5111,7 +5112,7 @@ function renderCalendar(history, chartEl) {
                 port_total_invested: 'Capital externe', port_cumulative: 'Gains cumulés',
                 port_pnl: 'Profit / Perte', port_roi_label: 'ROI',
                 port_active_days: 'Jours actifs', port_daily_avg: 'Gain moyen / jour',
-                port_payback: 'Retour investissement', port_asset_value: 'Valeur actifs', port_paid_back: 'Remboursé !',
+                port_payback: 'Retour investissement', port_asset_value: 'Valeur de remplacement', port_paid_back: 'Remboursé !',
                 // Labels
                 lbl_breakeven: 'Breakeven BTC', lbl_daily_fees: 'Frais quotidiens',
                 lbl_objective: 'Objectif $', lbl_today_label: "aujourd'hui",
@@ -5172,6 +5173,7 @@ function renderCalendar(history, chartEl) {
                 cat_deposit: '💵 Dépôt (argent entrant)',
                 port_recovered_label: 'Récupéré',
                 port_cost_per_th: 'Coût / TH',
+                port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
                 port_need_deposit: 'Ajoute une ligne Dépôt — seul l\'argent venu de l\'extérieur compte comme capital.',
                 port_capital_fallback: 'Estimé d\'après tes achats. Saisis tes dépôts pour un chiffre exact.',
                 guide_store_cta: 'Installer depuis le Chrome Web Store',
@@ -5252,6 +5254,14 @@ function renderCalendar(history, chartEl) {
                     else if (el.tagName === 'OPTION') el.textContent = dict[key];
                     else el.innerHTML = dict[key];
                 }
+            });
+            // Infobulles traduisibles. Sans ça, un `title` reste dans la langue
+            // où il a été écrit — et une explication qu'on ne peut pas lire ne
+            // sert à rien. Séparé de data-i18n parce qu'un élément peut avoir
+            // besoin des deux, sur des clés différentes.
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                const key = el.dataset.i18nTitle;
+                if (dict[key]) el.title = dict[key];
             });
         }
 
@@ -5650,8 +5660,21 @@ function renderCalendar(history, chartEl) {
             const thNow = parseFloat(document.getElementById('hashrate')?.value) || 0;
             const thCost = parseFloat(document.getElementById('cost-per-th-upgrade')?.value) || 12.34;
             const lockedGmt = parseFloat(document.getElementById('gmt-locked')?.value) || 0;
-            const assetValue = thNow * thCost + lockedGmt * (state.gmtPrice || 0);
-            const withdrawn = 0; // aucune sortie détectée pour l'instant (voir ledger)
+            // Soldes liquides : ils étaient absents du calcul alors que
+            // l'extension les fournit déjà. Négligeable pour une ferme mûre,
+            // mais pas pour quelqu'un qui vient de vendre un mineur et dont
+            // le produit dort encore en solde.
+            const liquidGmt = parseFloat(document.getElementById('gmt-prepaid')?.value) || 0;
+            const liquidBtc = state.btcWalletBalance || 0;
+            const gp = state.gmtPrice || 0;
+            // Valeur de REMPLACEMENT, pas cote de marché : les TH sont valorisés
+            // au taux d'upgrade in-app, c'est-à-dire au prix du neuf. C'est un
+            // plafond — la revente sur le marché secondaire se fait sous ce prix,
+            // frais compris. Le libellé le dit maintenant explicitement.
+            const assetValue = thNow * thCost
+                             + (lockedGmt + liquidGmt) * gp
+                             + liquidBtc * (state.btcPrice || 0);
+            const withdrawn = 0; // aucune sortie externe détectée dans le relevé
 
             const pnl = assetValue + withdrawn - capital;
             // Convention demandée : 100 % = investissement intégralement récupéré.
