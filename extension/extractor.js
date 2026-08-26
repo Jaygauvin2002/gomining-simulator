@@ -438,6 +438,7 @@
                 </div>
 
                 <div class="gm-meta" id="gm-meta"></div>
+                <a class="gm-nudge" id="gm-nudge" href="https://gmsim.ca/" target="_blank" rel="noopener" hidden></a>
 
                 <div class="gm-footer">
                     <span id="gm-req-count" style="display:none">0</span>
@@ -507,7 +508,41 @@
         el.innerHTML = html || 'Aucune donnée trouvée';
     }
 
+    // Rappel de retour — n'apparaît que si le simulateur n'a pas été ouvert
+    // depuis un moment ET que le marché a bougé assez pour que ça change
+    // quelque chose. Strictement factuel : c'est un constat sur les données de
+    // l'utilisateur, pas une promotion. Silencieux le reste du temps.
+    const NUDGE_MIN_DAYS = 3;
+    const NUDGE_MIN_MOVE = 5;   // % de variation du BTC
+
+    function updateNudge() {
+        const el = document.getElementById('gm-nudge');
+        if (!el) return;
+        try {
+            chrome.storage.local.get('gmsLastVisit', function (res) {
+                if (chrome.runtime.lastError) return;
+                const snap = res && res.gmsLastVisit;
+                const now = DATA.prices && DATA.prices.btcPriceInternal;
+                if (!snap || !snap.t || !snap.btc || !now) { el.hidden = true; return; }
+
+                const days = Math.floor((Date.now() - new Date(snap.t).getTime()) / 86400000);
+                const move = ((now - snap.btc) / snap.btc) * 100;
+                if (days < NUDGE_MIN_DAYS || Math.abs(move) < NUDGE_MIN_MOVE) {
+                    el.hidden = true;
+                    return;
+                }
+
+                const sign = move >= 0 ? '+' : '';
+                el.textContent = 'Bitcoin ' + sign + move.toFixed(1) + '% depuis ta dernière visite ('
+                               + days + 'j) · revoir ta stratégie →';
+                el.className = 'gm-nudge ' + (move >= 0 ? 'up' : 'down');
+                el.hidden = false;
+            });
+        } catch (e) { /* jamais bloquer le panneau */ }
+    }
+
     function updatePanel() {
+        updateNudge();
         // Status indicator
         const statusText = document.getElementById('gm-status-text');
         const statusDot = document.querySelector('.gm-dot');

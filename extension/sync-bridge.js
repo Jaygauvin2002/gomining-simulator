@@ -70,6 +70,24 @@
         });
     } catch (e) { markInvalidated('storage.onChanged'); }
 
+    // Le simulateur garde un instantané de chaque visite dans son propre
+    // localStorage : date, prix du BTC, stratégie optimale du moment. On le
+    // recopie dans chrome.storage pour que le panneau injecté sur
+    // app.gomining.com puisse dire ce qui a bougé depuis — l'extension n'a
+    // aucun autre moyen de savoir quand GMSim a été ouvert pour la dernière fois.
+    function mirrorVisitSnapshot() {
+        if (invalidated || !isContextValid()) return;
+        try {
+            const raw = window.localStorage.getItem('gms_last_visit');
+            if (!raw) return;
+            const snap = JSON.parse(raw);
+            if (!snap || !snap.t || !snap.btc) return;
+            chrome.storage.local.set({ gmsLastVisit: snap }, function () {
+                void chrome.runtime.lastError;
+            });
+        } catch (e) { /* ne jamais faire tomber le bridge pour ça */ }
+    }
+
     // Poll fallback — guard against invalidated context every tick
     function syncData() {
         if (!isContextValid()) { markInvalidated('isContextValid=false'); return; }
@@ -89,4 +107,9 @@
     // Initial sync + polling fallback
     setTimeout(syncData, 1000);
     pollHandle = setInterval(syncData, POLL_INTERVAL);
+
+    // L'instantané est écrit par le simulateur une fois ses données posées :
+    // on le relit un peu plus tard, puis à chaque tour de poll.
+    setTimeout(mirrorVisitSnapshot, 8000);
+    setInterval(mirrorVisitSnapshot, POLL_INTERVAL);
 })();
