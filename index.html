@@ -4405,6 +4405,20 @@ function renderCalendar(history, chartEl) {
         function mergeCapital(stored, incoming) {
             if (!incoming) return stored;
             if (!stored) return incoming;
+
+            // Un objet issu d'un schéma plus ancien perd toujours, quel que soit
+            // son nombre de transactions — il ne pourra JAMAIS acquérir le champ
+            // qui lui manque.
+            //
+            // C'est un piège que la première version posait : un capital calculé
+            // sur 121 transactions par une extension antérieure à `byCategory`
+            // battait éternellement un calcul plus récent mais assis sur moins de
+            // lignes. La ventilation ne pouvait alors plus jamais se remplir, quoi
+            // que fasse l'utilisateur — recharger, re-scanner, rien n'y faisait.
+            const richer = (x) => !!(x && x.byCategory && Object.keys(x.byCategory).length > 0);
+            if (richer(incoming) && !richer(stored)) return incoming;
+            if (richer(stored) && !richer(incoming)) return stored;
+
             const a = incoming.txCount || 0;
             const b = stored.txCount || 0;
             return a >= b ? incoming : stored;
@@ -5093,6 +5107,7 @@ function renderCalendar(history, chartEl) {
                 port_pct_year: '%/year',
                 port_bd_ledger: 'Filled in from your GoMining transactions — nothing to enter by hand. Manual entries stay in the table below and are not counted twice.',
                 port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
+                port_bd_no_cats: 'captured before categorisation existed — reload the extension',
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
                 port_need_deposit: 'Add a Deposit entry — only money from outside counts as capital.',
                 port_capital_fallback: 'Estimated from purchases. Log your deposits for an exact figure.',
@@ -5358,6 +5373,7 @@ function renderCalendar(history, chartEl) {
                 port_pct_year: ' %/an',
                 port_bd_ledger: 'Rempli depuis tes transactions GoMining — rien à saisir. Tes lignes manuelles restent dans la table ci-dessous et ne sont pas comptées deux fois.',
                 port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
+                port_bd_no_cats: 'capturé avant la catégorisation — recharge l\'extension',
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
                 port_need_deposit: 'Ajoute une ligne Dépôt — seul l\'argent venu de l\'extérieur compte comme capital.',
                 port_capital_fallback: 'Estimé d\'après tes achats. Saisis tes dépôts pour un chiffre exact.',
@@ -6063,8 +6079,15 @@ function renderCalendar(history, chartEl) {
             bdHtml += '</div>';
             // Dire d'où vient la ventilation : « depuis tes transactions GoMining »
             // et « depuis tes saisies » ne s'interprètent pas pareil.
+            // Diagnostic visible : dire ce que le site a réellement en mémoire.
+            // Sans ça, « d'après tes saisies » ne distingue pas « aucun relevé
+            // capté » de « relevé capté mais trop ancien pour être ventilé », et
+            // on cherche à l'aveugle.
+            const capDiag = state.capital
+                ? ` (${state.capital.txCount || 0} tx${bdFromLedger ? '' : ', ' + t('port_bd_no_cats')})`
+                : '';
             bdHtml += `<p style="margin:12px 0 0;font-size:0.74em;color:var(--text-dim);">${
-                bdFromLedger ? t('port_bd_ledger') : t('port_bd_manual')}</p>`;
+                (bdFromLedger ? t('port_bd_ledger') : t('port_bd_manual')) + capDiag}</p>`;
             document.getElementById('port-breakdown').innerHTML = bdHtml;
 
             // Projection (mining + staking)

@@ -70,6 +70,27 @@ check(mergeCapital(null, null) === null, 'rien de part et d’autre → null');
         'sans txCount côté stocké, une mesure complète passe');
 }
 
+// 6bis. Un schéma plus ancien ne doit JAMAIS gagner, même avec plus de
+//       transactions. C'était le piège : un capital sur 121 tx calculé avant
+//       l'existence de `byCategory` battait éternellement un calcul récent sur
+//       moins de lignes, et la ventilation ne pouvait plus jamais se remplir.
+{
+  const oldSchema = { txCount: 121, gmtEquivalent: 23705 };                     // sans byCategory
+  const newSchema = { txCount: 9, gmtEquivalent: 900, byCategory: { nft: { gmt: 500, txCount: 1 } } };
+  check(mergeCapital(oldSchema, newSchema).byCategory !== undefined,
+        'un calcul récent avec ventilation doit battre un ancien sans, même sur moins de tx');
+  check(mergeCapital(newSchema, oldSchema).byCategory !== undefined,
+        'et l’inverse : un ancien sans ventilation ne doit pas écraser un récent qui en a');
+}
+
+// 6ter. À schémas égaux, on retombe sur la règle du nombre de transactions.
+{
+  const a = { txCount: 121, gmtEquivalent: 23705, byCategory: { nft: { gmt: 10569, txCount: 10 } } };
+  const b = { txCount: 9,   gmtEquivalent: 900,   byCategory: { nft: { gmt: 500, txCount: 1 } } };
+  check(mergeCapital(a, b).gmtEquivalent === 23705,
+        'deux objets ventilés : le plus complet gagne (obtenu ' + mergeCapital(a, b).gmtEquivalent + ')');
+}
+
 // 7. Le câblage doit être là : chargement au boot et sauvegarde à la synchro.
 check(/state\.capital = loadCapital\(\)/.test(HTML), 'le capital doit être chargé au démarrage');
 check(/saveCapital\(state\.capital\)/.test(HTML), 'le capital doit être sauvegardé après fusion');
