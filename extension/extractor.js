@@ -226,7 +226,28 @@
     // il resterait bloqué.
     const HARD_DENYLIST = /\/auth\/|\/oauth|\/kyc|\/profile|\/i18n\/|\/assets\/|\.json(\?|$)|config\.ton\.org|intercom|\/banner-configuration\/|\/academy\/|\/achievement-template\/|\/loan-api\/|\/notification\/|\/ab-tests\/|\/nft-collection\/index/i;
 
+    // Mode exploration. Le manifest du dépôt porte « (DEV) » dans son nom et
+    // build-zip.sh le retire pour le paquet publié — donc ceci est vrai sur la
+    // copie chargée non empaquetée, et faux chez les utilisateurs, sans qu'il y
+    // ait un second interrupteur à penser à remettre.
+    //
+    // Sert à inspecter un endpoint avant de décider s'il mérite d'être capté en
+    // production : on le liste ici, on capture, on regarde le payload, et on
+    // choisit ensuite en connaissance de cause plutôt qu'à l'intuition.
+    const IS_DEV = (function () {
+        try { return /\(DEV\)/.test(chrome.runtime.getManifest().name); }
+        catch (e) { return false; }
+    })();
+
+    // En cours d'examen : reconstruire le capital investi. `nft/get-my` ne donne
+    // que le prix d'achat initial du NFT ; tout ce qui a été dépensé en upgrades
+    // de puissance n'y figure pas (chez Jérémie : ~725 $ d'achats pour ~4 150 $
+    // réellement investis). L'historique de transactions est le seul endroit où
+    // cette dépense pourrait apparaître.
+    const DEV_PROBE = /\/wallet\/transaction-history/i;
+
     function isStorableUrl(url) {
+        if (IS_DEV && DEV_PROBE.test(url || '')) return true;
         const u = url || '';
         if (HARD_DENYLIST.test(u)) return false;
         return SOLO_ALLOWLIST.test(u);

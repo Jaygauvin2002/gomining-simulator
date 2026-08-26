@@ -166,6 +166,18 @@ check(/HISTORY_BYTE_BUDGET/.test(mergeBlock), 'la fusion doit consommer HISTORY_
 // prices.raw ne doit être gardé que pour une vraie source de prix.
 check(/isPriceSource/.test(SRC), 'prices.raw doit être restreint aux sources de prix');
 
+// ---------- la sonde DEV ne doit pas pouvoir fuir en production ----------
+// DEV_PROBE contourne délibérément la liste blanche pour inspecter un endpoint
+// avant de décider s'il mérite d'être capté. La seule chose qui l'empêche
+// d'atteindre les utilisateurs est IS_DEV, dérivé du nom du manifest — et
+// build-zip.sh retire « (DEV) » du paquet publié.
+if (/DEV_PROBE/.test(SRC)) {
+  check(/IS_DEV && DEV_PROBE\.test/.test(SRC),
+        'DEV_PROBE doit être conditionnée par IS_DEV');
+  check(/getManifest\(\)\.name/.test(SRC),
+        'IS_DEV doit être dérivé du nom du manifest, pas d’un drapeau à remettre à la main');
+}
+
 // ---------- garde-fous de publication ----------
 // Le manifest du dépôt doit porter le suffixe (DEV) : c'est ce qui distingue
 // la copie chargée non empaquetée de celle du store dans chrome://extensions.
