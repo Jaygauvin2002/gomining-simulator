@@ -26,7 +26,11 @@ dans un vrai navigateur.
    dernier gagne et tu ne sais plus laquelle tu observes.
 2. Mode développeur → **Charger l'extension non empaquetée** →
    `/Users/mac/Documents/GOMINING/extension`
-3. Vérifie le numéro de version affiché sur la tuile.
+3. La tuile chargée s'appelle **« GMSim — Miner Sync (DEV) »** — celle du
+   store n'a pas ce suffixe. Le panneau injecté sur GoMining affiche aussi
+   « GMSim Sync (DEV) », donc tu sais laquelle tourne sur la page sans avoir
+   à comparer des numéros de version.
+4. Vérifie quand même le numéro de version sur la tuile.
 
 ## 2. Capture
 
@@ -67,5 +71,13 @@ Sur `gmsim.ca` (ou en local) :
 
 ## 5. Seulement maintenant
 
-Bumper la version dans `manifest.json`, reconstruire le zip (voir SETUP.md),
-téléverser dans la console développeur. Une seule fois.
+Bumper la version dans `manifest.json`, puis :
+
+```
+./extension/build-zip.sh
+node extension/tests/routing.test.mjs
+```
+
+Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le
+zip s'il en reste la moindre trace. Téléverser ensuite dans la console
+développeur. **Une seule fois.**

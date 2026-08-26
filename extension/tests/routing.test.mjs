@@ -12,7 +12,8 @@
 //
 // Usage :  node extension/tests/routing.test.mjs
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -145,6 +146,29 @@ check(/keepFrom/.test(SRC) && /MAX_HISTORY_DAYS \* 24 \* 3600 \* 1000/.test(SRC)
 
 // prices.raw ne doit être gardé que pour une vraie source de prix.
 check(/isPriceSource/.test(SRC), 'prices.raw doit être restreint aux sources de prix');
+
+// ---------- garde-fous de publication ----------
+// Le manifest du dépôt doit porter le suffixe (DEV) : c'est ce qui distingue
+// la copie chargée non empaquetée de celle du store dans chrome://extensions.
+// Et le zip destiné au store ne doit jamais le contenir.
+const manifest = JSON.parse(readFileSync(join(here, '..', 'manifest.json'), 'utf8'));
+check(/\(DEV\)/.test(manifest.name),
+      'le manifest du dépôt doit garder le suffixe (DEV) — build-zip.sh le retire pour le store');
+
+const zipPath = join(here, '..', '..', 'extension.zip');
+if (existsSync(zipPath)) {
+  let zipManifest = '';
+  try {
+    zipManifest = execFileSync('unzip', ['-p', zipPath, 'manifest.json'], { encoding: 'utf8' });
+  } catch { /* zip illisible : traité comme un échec ci-dessous */ }
+  check(zipManifest.length > 0, 'extension.zip doit contenir un manifest lisible');
+  check(!/DEV/i.test(zipManifest), 'extension.zip ne doit contenir aucun « DEV »');
+  try {
+    const zm = JSON.parse(zipManifest);
+    check(zm.version === manifest.version,
+          `la version du zip (${zm.version}) doit suivre celle du manifest (${manifest.version}) — relancer build-zip.sh`);
+  } catch { fails.push('manifest du zip illisible en JSON'); }
+}
 
 // ---------- rapport ----------
 const total = pass + fails.length;

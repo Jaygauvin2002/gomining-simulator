@@ -446,7 +446,13 @@
         const toggle = document.createElement('button');
         toggle.id = 'gm-extractor-toggle';
         toggle.innerHTML = '<img src="' + chrome.runtime.getURL('icon-128.png') + '" style="width:30px;height:30px;border-radius:6px;">';
-        toggle.title = 'GMSim Sync';
+        // Afficher le nom du manifest : en local il porte le suffixe (DEV), donc
+        // on voit immédiatement laquelle des deux extensions injecte la page.
+        const EXT_NAME = (function () {
+            try { return chrome.runtime.getManifest().name.replace('— Miner Sync', 'Sync'); }
+            catch (e) { return 'GMSim Sync'; }
+        })();
+        toggle.title = EXT_NAME;
         document.body.appendChild(toggle);
 
         // Panel
@@ -454,7 +460,7 @@
         panel.id = 'gm-extractor-panel';
         panel.innerHTML = `
             <div class="gm-header">
-                <span>GMSim Sync</span>
+                <span>${EXT_NAME}</span>
                 <button id="gm-close">×</button>
             </div>
             <div class="gm-body">

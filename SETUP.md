@@ -211,15 +211,20 @@ into already-open pages.
 
 ### Rebuilding extension.zip
 
-From the repo root, flat (no enclosing folder):
-
 ```
-rm -f extension.zip
-cd extension && zip -X -q ../extension.zip \
-  extractor.js icon-16.png icon-48.png icon-128.png \
-  inject-early.js interceptor.js manifest.json panel.css sync-bridge.js
-cd ..
+./extension/build-zip.sh
 ```
 
-Keep it in sync whenever anything under `extension/` changes — `gmsim.ca`
-serves this file directly from the repo as the public download.
+Do not zip by hand. The manifest in this repo deliberately carries a
+`(DEV)` suffix in its name, so the copy you load unpacked is
+distinguishable from the store build in `chrome://extensions` and in the
+panel injected on GoMining. The script strips that suffix for the
+published package and refuses to write the zip if any trace of `DEV`
+survives — which is why there is nothing to remember to undo before an
+upload.
+
+`node extension/tests/routing.test.mjs` also fails if the zip carries a
+`DEV` name, or if its version has drifted from the manifest.
+
+Keep the zip in sync whenever anything under `extension/` changes —
+`gmsim.ca` still serves this file directly as a fallback download.
