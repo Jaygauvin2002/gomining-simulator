@@ -5081,6 +5081,7 @@ function renderCalendar(history, chartEl) {
                 port_cum_estimate: 'Estimated from the current daily rate',
                 port_avg_window: 'Over the last {n} measured day(s)',
                 port_avg_calc: 'No measured day yet — calculated rate',
+                port_pct_year: '%/year',
                 port_bd_ledger: 'Filled in from your GoMining transactions — nothing to enter by hand. Manual entries stay in the table below and are not counted twice.',
                 port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
@@ -5345,6 +5346,7 @@ function renderCalendar(history, chartEl) {
                 port_cum_estimate: 'Estimé d\'après le rythme quotidien actuel',
                 port_avg_window: 'Sur les {n} dernier(s) jour(s) mesuré(s)',
                 port_avg_calc: 'Aucun jour mesuré — rythme calculé',
+                port_pct_year: ' %/an',
                 port_bd_ledger: 'Rempli depuis tes transactions GoMining — rien à saisir. Tes lignes manuelles restent dans la table ci-dessous et ne sont pas comptées deux fois.',
                 port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
@@ -5967,7 +5969,19 @@ function renderCalendar(history, chartEl) {
             }
 
             document.getElementById('port-days').textContent = days + 'j';
-            document.getElementById('port-daily-avg').textContent = formatUSD(dailyAvg);
+            // Le rythme seul ne dit pas s'il est bon : $9,74 par jour est excellent
+            // sur $7 800 de capital, médiocre sur $80 000. On annualise donc ce
+            // rythme et on le rapporte au capital externe — le même dénominateur
+            // que « Récupéré », pour que les deux se lisent ensemble.
+            const avgRoiPct = (capital > 0 && dailyAvg > 0) ? (dailyAvg * 365 / capital * 100) : null;
+            const avgEl = document.getElementById('port-daily-avg');
+            avgEl.textContent = formatUSD(dailyAvg);
+            if (avgRoiPct !== null) {
+                const span = document.createElement('span');
+                span.className = 'port-kpi-annot';
+                span.textContent = ' (' + avgRoiPct.toFixed(0) + t('port_pct_year') + ')';
+                avgEl.appendChild(span);
+            }
             const avgSub = document.getElementById('port-daily-avg-sub');
             if (avgSub) {
                 avgSub.textContent = avgCount > 0

@@ -87,7 +87,21 @@ const day = (date, valueBtc, btcPrice = 78000, partial = false) => ({ date, valu
   check(!threw && r.dailyAvg === 0, 'historique null toléré');
 }
 
-// 7. Le compte est affiché : un jour ne doit pas se faire passer pour sept.
+// 7. Le rendement annualisé accolé à la moyenne : c'est ce qui rend le chiffre
+//    lisible. $9,74/jour est excellent sur $7 800 de capital, médiocre sur
+//    $80 000 — le rythme seul ne le dit pas.
+{
+  const roi = (daily, capital) => daily * 365 / capital * 100;
+  check(Math.round(roi(9.74, 7825)) === 45, `9,74 $/jour sur 7 825 $ → 45 %/an (obtenu ${Math.round(roi(9.74, 7825))})`);
+  check(Math.round(roi(1.90, 7825)) === 9, `1,90 $/jour → 9 %/an (obtenu ${Math.round(roi(1.90, 7825))})`);
+  check(/dailyAvg \* 365 \/ capital \* 100/.test(HTML),
+        'le rendement doit annualiser le rythme et le rapporter au capital');
+  check(/capital > 0 && dailyAvg > 0/.test(HTML),
+        'aucun pourcentage sans capital connu — pas de division par zéro déguisée');
+  check(/port_pct_year/.test(HTML), 'l’unité %/an doit être traduite, pas codée en dur');
+}
+
+// 8. Le compte est affiché : un jour ne doit pas se faire passer pour sept.
 check(/port_avg_window/.test(HTML) && /\{n\}/.test(HTML),
       'le nombre de jours mesurés doit être affiché sous la valeur');
 

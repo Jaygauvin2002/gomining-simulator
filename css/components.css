@@ -2751,3 +2751,13 @@ body.has-live-footer .main-content { padding-bottom: 64px; }
   line-height: 1.35;
   color: var(--text-dim, #8794a6);
 }
+
+/* Rendement annualisé accolé au gain quotidien : c'est une lecture du chiffre
+   principal, pas un chiffre concurrent — d'où la taille et la couleur en retrait. */
+.port-kpi-annot {
+  font-size: .58em;
+  font-weight: 600;
+  color: var(--text-dim, #8794a6);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
