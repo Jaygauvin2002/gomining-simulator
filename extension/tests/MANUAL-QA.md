@@ -14,6 +14,7 @@ node extension/tests/reward-day.test.mjs [chemin-vers-un-export.json]
 node extension/tests/reward-formula.test.mjs
 node extension/tests/reinvest-th.test.mjs
 node extension/tests/capital-persist.test.mjs
+node extension/tests/migration.test.mjs
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -99,6 +100,19 @@ Sur `gmsim.ca` (ou en local) :
 - [ ] Pool Reward / sat-per-TH cohérents
 - [ ] pas d'erreur dans la console
 
+## 4bis. Règle sur les données stockées
+
+**Migrer, jamais jeter.** Un changement de format qui invalide un stockage doit
+s'accompagner d'une fonction de conversion, pas d'un `removeItem`. Le 2026-08-26
+la correction de datation a d'abord été livrée avec une suppression : le décalage
+était pourtant d'exactement un jour, donc réparable sans perte, et tout ce qu'un
+utilisateur avait accumulé au-delà de ce que l'extension retient encore a été
+détruit pour rien.
+
+Si une migration est réellement impossible, le dire dans le message de commit et
+expliquer pourquoi. `migration.test.mjs` échoue si `loadRewardHistory` recommence
+à supprimer.
+
 ## 5. Seulement maintenant
 
 Bumper la version dans `manifest.json`, puis :
@@ -113,6 +127,7 @@ node extension/tests/reward-day.test.mjs [chemin-vers-un-export.json]
 node extension/tests/reward-formula.test.mjs
 node extension/tests/reinvest-th.test.mjs
 node extension/tests/capital-persist.test.mjs
+node extension/tests/migration.test.mjs
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le

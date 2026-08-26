@@ -4400,12 +4400,42 @@ function renderCalendar(history, chartEl) {
             return a >= b ? incoming : stored;
         }
 
+        // Décale les dates d'un stockage v1 d'un jour en arrière. Les entrées v1
+        // étaient datées de createdAt — la date d'écriture GoMining — alors que le
+        // jour miné est la veille. Le décalage est déterministe, donc la conversion
+        // est SANS PERTE : il n'y avait aucune raison de jeter ces jours.
+        function migrateRewardHistoryV1toV2(history) {
+            const shift = (d) => {
+                const t = Date.parse(String(d).substring(0, 10) + 'T00:00:00Z');
+                return isFinite(t) ? new Date(t - 86400000).toISOString().substring(0, 10) : null;
+            };
+            const out = [];
+            const seen = new Set();
+            for (const day of history || []) {
+                const nd = shift(day?.date);
+                if (!nd || seen.has(nd)) continue;   // dédoublonner au cas où
+                seen.add(nd);
+                out.push({ ...day, date: nd, partial: false });
+            }
+            return out.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        }
+
         function loadRewardHistory() {
             try {
-                if (localStorage.getItem(RH_KEY + '_ver') !== RH_VERSION) {
-                    localStorage.removeItem(RH_KEY);
+                const ver = localStorage.getItem(RH_KEY + '_ver');
+                if (ver !== RH_VERSION) {
+                    let raw = null;
+                    try { raw = JSON.parse(localStorage.getItem(RH_KEY)); } catch (e) {}
+                    // Migrer plutôt que jeter. Un stockage jamais versionné est du v1 :
+                    // ses dates sont décalées d'un jour, ce qui se répare exactement.
+                    // Ce qu'un utilisateur avait accumulé au-delà de ce que l'extension
+                    // retient encore serait sinon perdu pour de bon.
+                    const migrated = (ver === null && Array.isArray(raw) && raw.length > 0)
+                        ? migrateRewardHistoryV1toV2(raw)
+                        : [];
+                    localStorage.setItem(RH_KEY, JSON.stringify(migrated));
                     localStorage.setItem(RH_KEY + '_ver', RH_VERSION);
-                    return [];   // l'extension le reconstruit à la prochaine synchro
+                    return migrated;
                 }
                 return JSON.parse(localStorage.getItem(RH_KEY)) || [];
             } catch(e) { return []; }
