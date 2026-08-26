@@ -219,7 +219,7 @@
     // JWT actif — puis les recopiait dans le localStorage de gmsim.ca.
     // Chaque entrée ci-dessous correspond à une lecture réelle dans
     // extractEssentials() ou dans le bloc prix.
-    const SOLO_ALLOWLIST = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)\b|\/nft-income\/find-aggregated-by-date|\/nft-income-aggregation\/get-last|\/wallet\/find-by-user|\/get-my-nft-discount|\/user\/get-total-income-values|\/home-page\/get-info|\/ve-gomining-lock\/(find-by-user|statistics)|getTokenPrice/i;
+    const SOLO_ALLOWLIST = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)\b|\/nft-income\/find-aggregated-by-date|\/nft-income-aggregation\/get-last|\/wallet\/find-by-user|\/bonus-miner\/client\/find-one|\/get-my-nft-discount|\/user\/get-total-income-values|\/home-page\/get-info|\/ve-gomining-lock\/(find-by-user|statistics)|getTokenPrice/i;
 
     // Refus explicite, évalué avant la liste blanche. Ceinture et bretelles :
     // si un endpoint sensible venait un jour à ressembler à un endpoint solo,
@@ -238,6 +238,15 @@
         try { return /\(DEV\)/.test(chrome.runtime.getManifest().name); }
         catch (e) { return false; }
     })();
+
+    // NOTE 2026-08-26 : `bonus-miner/client/find-one` vient d'être ajouté à la
+    // liste blanche. Le Bonus miner (#531186 chez Jérémie, 0,40 TH) est un vrai
+    // mineur qui produit de vraies récompenses, mais il n'apparaît PAS dans
+    // /nft/get-my — il a son propre hôte. C'est très probablement l'origine de
+    // l'écart de 2,16 TH de mai (333,27 sommés contre 335,43 affichés) qui avait
+    // motivé le scan global et le scraping du DOM. On avait bâti des heuristiques
+    // pour deviner un nombre qu'une API voisine donnait proprement.
+    // Sa puissance reste à sommer : voir le TODO dans extractEssentials.
 
     // En cours d'examen : reconstruire le capital investi. `nft/get-my` ne donne
     // que le prix d'achat initial du NFT ; tout ce qui a été dépensé en upgrades

@@ -90,6 +90,9 @@ const MUST_STORE = [
   API + 've-gomining-lock/find-by-user',
   API + 've-gomining-lock/statistics',
   API + 'exchanges/getTokenPrice',
+  // Le Bonus miner a son propre hôte et n'est pas dans /nft/get-my ; sans lui
+  // la puissance de ferme est sous-comptée de sa valeur (0,40 TH chez Jérémie).
+  'https://api.bonus-miner.gomining.com/api/bonus-miner/client/find-one',
 ];
 
 // Tout ce qui suit a réellement été capté par une version antérieure.
@@ -103,7 +106,6 @@ const MUST_REJECT = [
   API + 'config/ab-tests/get-user-info',
   API + 'bonus-cashback-miner/get',
   API + 'wallet/transaction-history',
-  'https://api.bonus-miner.gomining.com/api/bonus-miner/client/find-one',
   'https://internal-api.btc-loans.gomining.com/api/loan-api/v2/loans/positions',
   'https://internal-api.btc-loans.gomining.com/api/loan-api/v2/loans/total-debt',
   'https://api.gomining-notification-server.gmt.io/api/promos-notification/client/notification/get',
