@@ -3405,6 +3405,11 @@
             if (data.wallet?.gmtLocked !== undefined) document.getElementById('gmt-locked').value = data.wallet.gmtLocked;
             if (data.wallet?.btcBalance !== undefined) state.btcWalletBalance = data.wallet.btcBalance;
 
+            // Capital externe, reconstitué depuis le relevé de transactions.
+            // Reste null si le relevé n'a pas été capté — le Portfolio doit
+            // pouvoir distinguer « aucun dépôt » de « je n'en sais rien ».
+            if (data.capital) state.capital = data.capital;
+
             // Discounts (API returns decimals: 0.03 = 3%)
             // The API is the source of truth — set discountFromApi so the
             // local prepaid-days heuristic in updatePrepaidDiscount() doesn't
@@ -4922,6 +4927,8 @@ function renderCalendar(history, chartEl) {
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
                 port_need_deposit: 'Add a Deposit entry — only money from outside counts as capital.',
                 port_capital_fallback: 'Estimated from purchases. Log your deposits for an exact figure.',
+                port_capital_ledger: 'From your GoMining deposits — {gmt} GMT, converted at your own historical rates.',
+                port_capital_unvalued: 'Deposits found, but in a currency you never converted — no honest rate to value them.',
                 guide_store_cta: 'Install from the Chrome Web Store',
                 guide_ns1: 'Click <strong>Add to Chrome</strong> on the store page that opens',
                 guide_ns2: 'Open <strong>app.gomining.com</strong> and sign in — the extension icon appears bottom-right',
@@ -5176,6 +5183,8 @@ function renderCalendar(history, chartEl) {
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
                 port_need_deposit: 'Ajoute une ligne Dépôt — seul l\'argent venu de l\'extérieur compte comme capital.',
                 port_capital_fallback: 'Estimé d\'après tes achats. Saisis tes dépôts pour un chiffre exact.',
+                port_capital_ledger: 'Depuis tes dépôts GoMining — {gmt} GMT, convertis à tes propres taux historiques.',
+                port_capital_unvalued: 'Dépôts trouvés, mais dans une devise que tu n\'as jamais convertie — aucun taux honnête pour les valoriser.',
                 guide_store_cta: 'Installer depuis le Chrome Web Store',
                 guide_ns1: 'Clique <strong>Ajouter à Chrome</strong> sur la page du store qui s\'ouvre',
                 guide_ns2: 'Ouvre <strong>app.gomining.com</strong> et connecte-toi — l\'icône apparaît en bas à droite',
@@ -5614,8 +5623,25 @@ function renderCalendar(history, chartEl) {
             });
             // Repli pour les portefeuilles saisis avant l'existence de la catégorie
             // « dépôt » : on prend la somme des achats, faute de mieux, et on le dit.
-            const capitalIsFallback = capital === 0 && spent > 0;
-            if (capitalIsFallback) capital = spent;
+            // Le relevé de transactions fait foi quand il est disponible : il
+            // connaît les dépôts réels, y compris ceux que l'utilisateur a
+            // oubliés. Chez Jérémie il donne ~23 700 GMT là où sa saisie
+            // manuelle disait l'équivalent de 4 150 $ — presque la moitié.
+            const led = state.capital;
+            const ledgerGmt = led && led.gmtEquivalent;
+            let capitalSource = 'none';
+            if (ledgerGmt && (state.gmtPrice || 0) > 0) {
+                capital = ledgerGmt * state.gmtPrice;
+                capitalSource = 'ledger';
+            } else if (capital > 0) {
+                capitalSource = 'deposits';       // lignes « Dépôt » saisies à la main
+            } else if (spent > 0) {
+                capital = spent;                  // repli : somme des achats
+                capitalSource = 'fallback';
+            } else if (led && Object.keys(led.unvalued || {}).length > 0) {
+                capitalSource = 'unvalued';       // dépôts vus, mais aucun taux honnête
+            }
+            const capitalIsFallback = capitalSource === 'fallback';
             const invested = capital;
 
             // Days since first activity — earliest of (first transaction) and (first synced reward day).
@@ -5706,9 +5732,13 @@ function renderCalendar(history, chartEl) {
             }
             const capNote = document.getElementById('port-capital-note');
             if (capNote) {
-                capNote.textContent = capital === 0
-                    ? t('port_need_deposit')
-                    : (capitalIsFallback ? t('port_capital_fallback') : '');
+                capNote.textContent =
+                      capitalSource === 'ledger'   ? t('port_capital_ledger').replace('{gmt}', Math.round(ledgerGmt).toLocaleString())
+                    : capitalSource === 'fallback' ? t('port_capital_fallback')
+                    : capitalSource === 'unvalued' ? t('port_capital_unvalued')
+                    : capitalSource === 'none'     ? t('port_need_deposit')
+                    : '';
+                capNote.style.color = capitalSource === 'ledger' ? 'var(--text-dim)' : 'var(--warn, #e0a342)';
                 capNote.style.display = capNote.textContent ? '' : 'none';
             }
 

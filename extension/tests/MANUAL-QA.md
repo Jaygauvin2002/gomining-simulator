@@ -9,6 +9,7 @@ qu'une fois cette liste terminée — pas de patch du patch en production.
 node extension/tests/routing.test.mjs
 node extension/tests/merge.test.mjs
 node extension/tests/bonus-miner.test.mjs
+node extension/tests/capital.test.mjs [chemin-vers-un-export.json]
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -54,6 +55,13 @@ Clique **Exporter JSON** dans le panneau, puis vérifie :
       parce que la clé ne garde que les deux derniers segments d'URL
 - [ ] la puissance affichée dans GMSim égale celle du widget « Mining farm »
       de GoMining, bonus inclus
+- [ ] le Portfolio indique « Depuis tes dépôts GoMining » sous le capital, et
+      non le message de repli — sinon le relevé n'a pas été capté assez loin
+      (il faut aussi les `asset-conversion`, pas seulement les dépôts, pour
+      que les taux soient mesurables)
+- [ ] `wallet/transaction-history` présent, et ses lignes réduites à 8 champs
+      (`id`, `createdAt`, `type`, `fromType`, `valueNumeric`, `walletType`,
+      `hasDepositTx`, `hasWithdrawOrder`) — aucun `travelRule*`, aucun `metadata`
 - [ ] `wallet/find-by-user` présent (soldes)
 - [ ] `home-page/get-info-v2` présent (prix)
 - [ ] **aucune** entrée `auth/`, `i18n`, `banner-configuration`,
@@ -84,6 +92,7 @@ Bumper la version dans `manifest.json`, puis :
 node extension/tests/routing.test.mjs
 node extension/tests/merge.test.mjs
 node extension/tests/bonus-miner.test.mjs
+node extension/tests/capital.test.mjs [chemin-vers-un-export.json]
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le

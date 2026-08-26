@@ -219,7 +219,7 @@
     // JWT actif — puis les recopiait dans le localStorage de gmsim.ca.
     // Chaque entrée ci-dessous correspond à une lecture réelle dans
     // extractEssentials() ou dans le bloc prix.
-    const SOLO_ALLOWLIST = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)\b|\/nft-income\/find-aggregated-by-date|\/nft-income-aggregation\/get-last|\/wallet\/find-by-user|\/bonus-miner\/client\/find-one|\/get-my-nft-discount|\/user\/get-total-income-values|\/home-page\/get-info|\/ve-gomining-lock\/(find-by-user|statistics)|getTokenPrice/i;
+    const SOLO_ALLOWLIST = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)\b|\/nft-income\/find-aggregated-by-date|\/nft-income-aggregation\/get-last|\/wallet\/find-by-user|\/wallet\/transaction-history|\/bonus-miner\/client\/find-one|\/get-my-nft-discount|\/user\/get-total-income-values|\/home-page\/get-info|\/ve-gomining-lock\/(find-by-user|statistics)|getTokenPrice/i;
 
     // Refus explicite, évalué avant la liste blanche. Ceinture et bretelles :
     // si un endpoint sensible venait un jour à ressembler à un endpoint solo,
@@ -253,7 +253,11 @@
     // de puissance n'y figure pas (chez Jérémie : ~725 $ d'achats pour ~4 150 $
     // réellement investis). L'historique de transactions est le seul endroit où
     // cette dépense pourrait apparaître.
-    const DEV_PROBE = /\/wallet\/transaction-history/i;
+    // Aucune sonde active. `wallet/transaction-history` est passé en production
+    // le 2026-08-26 après examen d'une capture réelle : c'est la seule source du
+    // capital externe, et sa taxonomie `fromType` est ce qui permet de distinguer
+    // l'argent venu de l'extérieur des mouvements internes.
+    const DEV_PROBE = /$^/;
 
     function isStorableUrl(url) {
         if (IS_DEV && DEV_PROBE.test(url || '')) return true;
@@ -305,6 +309,29 @@
     setInterval(purgeOldData, 30 * 60 * 1000);
     // Run once at startup to flush MW-leaked entries from any prior session.
     setTimeout(purgeOldData, 500);
+
+    // Réduit une transaction à ce qui sert au calcul du capital.
+    // `hasDepositTx` / `hasWithdrawOrder` remplacent les identifiants eux-mêmes :
+    // on a besoin de savoir qu'un mouvement a franchi la chaîne, pas de conserver
+    // sa référence on-chain.
+    //
+    // ATTENTION : ne pas se fier à `withdrawNetwork` pour repérer une sortie
+    // externe — ce champ nomme le réseau de l'actif, pas une destination. Il est
+    // rempli sur des `asset-conversion` purement internes. Les vrais marqueurs
+    // sont withdrawOrderId / withdrawOrderBlockchainTxId.
+    function slimTransaction(t) {
+        if (!t || typeof t !== 'object') return t;
+        return {
+            id: t.id,
+            createdAt: t.createdAt,
+            type: t.type,
+            fromType: t.fromType,
+            valueNumeric: t.valueNumeric,
+            walletType: t.walletType,
+            hasDepositTx: !!(t.depositTxId || t.depositNetwork),
+            hasWithdrawOrder: !!(t.withdrawOrderId || t.withdrawOrderBlockchainTxId),
+        };
+    }
 
     // Fusionne un tableau paginé dans celui déjà stocké, dédoublonné par clé et
     // borné par octets. L'API renvoie une page à la fois : sans ça, chaque page
@@ -359,6 +386,96 @@
             }
         }
         return null;
+    }
+
+    // === Capital externe, depuis le relevé de transactions ===================
+    //
+    // Le seul dénominateur légitime d'un ROI : ce qui a franchi la frontière du
+    // compte. Tout le reste — conversions, achats de mineurs, upgrades, lock —
+    // change la composition de l'actif, pas le capital. Compter un achat comme
+    // un investissement double-compte les gains réinvestis : ils ont déjà été
+    // comptés le jour où ils ont été minés.
+    //
+    // Les taux viennent des conversions de l'utilisateur lui-même, appariées par
+    // horodatage. Aucune source de prix externe, donc aucune dépendance et aucun
+    // historique à deviner : s'il a converti du SOL en GMT, on connaît son taux.
+    const EXTERNAL_IN = /^(fireblocks-deposit|payment)$/i;
+    const TH_SPEND    = /^(marketplace-withdraw|nft-upgrade-power)$/i;
+
+    function computeCapital() {
+        let entry = null;
+        for (const pool of [DATA.rewards, DATA.miners]) {
+            for (const e of Object.values(pool || {})) {
+                if (/\/wallet\/transaction-history/i.test(e?.url || '')) { entry = e; break; }
+            }
+            if (entry) break;
+        }
+        const txs = entry?.data?.data?.array;
+        if (!Array.isArray(txs) || txs.length === 0) return null;
+
+        const cur = (t) => String(t.walletType || '').replace('VIRTUAL_', '');
+        const amt = (t) => {
+            const n = Number(t.valueNumeric);
+            return isFinite(n) ? n / 1e18 : 0;
+        };
+
+        // --- taux X → GMT, appariés à la minute ---
+        const conv = txs.filter(t => t.fromType === 'asset-conversion')
+                        .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+        const given = {}, got = {};
+        const used = new Set();
+        for (let i = 0; i < conv.length; i++) {
+            const a = conv[i];
+            if (used.has(i) || a.type !== 'withdraw') continue;
+            for (let j = 0; j < conv.length; j++) {
+                const b = conv[j];
+                if (used.has(j) || j === i || b.type !== 'deposit') continue;
+                if (String(a.createdAt).slice(0, 16) !== String(b.createdAt).slice(0, 16)) continue;
+                used.add(i); used.add(j);
+                if (cur(b) === 'GMT' && cur(a) !== 'GMT' && amt(a) > 0) {
+                    given[cur(a)] = (given[cur(a)] || 0) + amt(a);
+                    got[cur(a)]   = (got[cur(a)]   || 0) + amt(b);
+                }
+                break;
+            }
+        }
+        const rates = {};
+        for (const c of Object.keys(given)) if (given[c] > 0) rates[c] = got[c] / given[c];
+
+        // --- entrées externes ---
+        const deposits = {};
+        let externalWithdrawals = 0;
+        const spentGmt = {};
+        for (const t of txs) {
+            const c = cur(t);
+            if (t.type === 'deposit' && EXTERNAL_IN.test(t.fromType || '')) {
+                deposits[c] = (deposits[c] || 0) + amt(t);
+            }
+            if (t.type === 'withdraw' && t.hasWithdrawOrder) externalWithdrawals += amt(t);
+            if (t.type === 'withdraw' && TH_SPEND.test(t.fromType || '') && c === 'GMT') {
+                spentGmt[t.fromType] = (spentGmt[t.fromType] || 0) + amt(t);
+            }
+        }
+
+        let gmtEquivalent = 0;
+        const unvalued = {};
+        for (const [c, v] of Object.entries(deposits)) {
+            if (c === 'GMT') gmtEquivalent += v;
+            else if (rates[c]) gmtEquivalent += v * rates[c];
+            else unvalued[c] = v;   // jamais converti par l'utilisateur → pas de taux honnête
+        }
+
+        return {
+            source: 'transaction-history',
+            txCount: txs.length,
+            deposits: deposits,
+            rates: rates,
+            unvalued: unvalued,
+            gmtEquivalent: gmtEquivalent > 0 ? gmtEquivalent : null,
+            externalWithdrawals: externalWithdrawals,
+            spentOnThGmt: Object.values(spentGmt).reduce((a, b) => a + b, 0),
+            spentBreakdownGmt: spentGmt,
+        };
     }
 
     // === Analyser les réponses API ===
@@ -430,10 +547,17 @@
             // écraser. C'est le seul moyen de reconstituer le capital externe —
             // l'API en renvoie ~9 par page et il peut y en avoir des dizaines.
             if (/\/wallet\/transaction-history/i.test(url) && Array.isArray(data?.data?.array)) {
+                // N'garder que les six champs qui servent, plus deux booléens de
+                // provenance. Le payload d'origine porte 21 champs par ligne,
+                // dont une quinzaine de nulls et des drapeaux de conformité
+                // (travelRule*) qui ne nous regardent pas. Sur des dizaines de
+                // transactions ça compte, et moins de données financières
+                // conservées est bon en soi.
+                data = JSON.parse(JSON.stringify(data));
+                data.data.array = data.data.array.map(slimTransaction);
                 const prev = DATA.rewards[key]?.data?.data?.array;
                 if (Array.isArray(prev)) {
                     const r = mergePagedArray(prev, data.data.array, (x) => x.id, HISTORY_BYTE_BUDGET);
-                    data = JSON.parse(JSON.stringify(data));
                     data.data.array = r.merged;
                     log('Merge transactions: +' + r.added + ' nouvelles → ' + r.merged.length +
                         ' au total' + (r.dropped ? ' (' + r.dropped + ' écartées, budget atteint)' : ''));
@@ -1208,6 +1332,11 @@
                 result.miner.powerSource = 'dom (aucun /nft/get-my capté)';
             }
         }
+
+        // Capital externe — null si le relevé n'a pas été capté, jamais un zéro
+        // trompeur : le site doit pouvoir faire la différence entre « aucun
+        // dépôt » et « je n'en sais rien ».
+        result.capital = computeCapital();
 
         return result;
     }

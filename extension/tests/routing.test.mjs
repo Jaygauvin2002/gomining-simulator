@@ -92,6 +92,10 @@ const MUST_STORE = [
   API + 'exchanges/getTokenPrice',
   // Le Bonus miner a son propre hôte et n'est pas dans /nft/get-my ; sans lui
   // la puissance de ferme est sous-comptée de sa valeur (0,40 TH chez Jérémie).
+  // Seule source du capital externe : sa taxonomie `fromType` distingue
+  // l'argent venu de l'extérieur des mouvements internes. Passé de la sonde
+  // DEV à la production le 2026-08-26, après examen d'une capture réelle.
+  API + 'wallet/transaction-history',
   'https://api.bonus-miner.gomining.com/api/bonus-miner/client/find-one',
 ];
 
@@ -105,7 +109,6 @@ const MUST_REJECT = [
   API + 'academy/course/find-all',
   API + 'config/ab-tests/get-user-info',
   API + 'bonus-cashback-miner/get',
-  API + 'wallet/transaction-history',
   'https://internal-api.btc-loans.gomining.com/api/loan-api/v2/loans/positions',
   'https://internal-api.btc-loans.gomining.com/api/loan-api/v2/loans/total-debt',
   'https://api.gomining-notification-server.gmt.io/api/promos-notification/client/notification/get',
