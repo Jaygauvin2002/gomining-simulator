@@ -7,6 +7,7 @@ qu'une fois cette liste terminée — pas de patch du patch en production.
 
 ```
 node extension/tests/routing.test.mjs
+node extension/tests/merge.test.mjs
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -76,6 +77,7 @@ Bumper la version dans `manifest.json`, puis :
 ```
 ./extension/build-zip.sh
 node extension/tests/routing.test.mjs
+node extension/tests/merge.test.mjs
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le

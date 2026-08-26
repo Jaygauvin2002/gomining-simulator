@@ -297,6 +297,43 @@
     // Run once at startup to flush MW-leaked entries from any prior session.
     setTimeout(purgeOldData, 500);
 
+    // Fusionne un tableau paginé dans celui déjà stocké, dédoublonné par clé et
+    // borné par octets. L'API renvoie une page à la fois : sans ça, chaque page
+    // chargée écrase la précédente et défiler ne sert à rien.
+    //
+    // La fusion de l'historique des récompenses, plus haut, fait la même chose à
+    // la main. Elle n'est pas migrée ici volontairement : elle fonctionne, elle
+    // porte des mois de données réelles, et la réécrire pour l'élégance ferait
+    // courir un risque sans bénéfice pour l'utilisateur.
+    function mergePagedArray(prevArray, nextArray, keyOf, budgetBytes) {
+        const byKey = new Map();
+        for (const item of prevArray || []) {
+            const k = keyOf(item);
+            if (k != null) byKey.set(String(k), item);
+        }
+        let added = 0;
+        for (const item of nextArray || []) {
+            const k = keyOf(item);
+            if (k == null) continue;
+            if (!byKey.has(String(k))) added++;
+            byKey.set(String(k), item);
+        }
+        // Plus récents d'abord, puis on remplit jusqu'au budget. Trier sur
+        // createdAt quand il existe, sinon sur la clé (les ids sont croissants).
+        const sortKey = (x) => x.createdAt || String(keyOf(x) ?? '');
+        const desc = Array.from(byKey.values()).sort((a, b) => String(sortKey(b)).localeCompare(String(sortKey(a))));
+        const kept = [];
+        let budget = budgetBytes;
+        for (const item of desc) {
+            const cost = JSON.stringify(item).length;
+            if (kept.length && cost > budget) break;
+            kept.push(item);
+            budget -= cost;
+        }
+        kept.sort((a, b) => String(sortKey(a)).localeCompare(String(sortKey(b))));
+        return { merged: kept, added: added, dropped: desc.length - kept.length };
+    }
+
     // === Analyser les réponses API ===
     function analyzeResponse(url, data) {
         // Rien n'est stocké hors de la liste blanche — voir isStorableUrl().
@@ -360,6 +397,20 @@
                 log('Merge reward history: ' + existing.length + ' + ' + newDays.length +
                     ' → ' + data.data.array.length + ' jours' +
                     (dropped ? ' (' + dropped + ' plus anciens écartés, budget atteint)' : ''));
+            }
+
+            // Historique de transactions : accumuler les pages au lieu de les
+            // écraser. C'est le seul moyen de reconstituer le capital externe —
+            // l'API en renvoie ~9 par page et il peut y en avoir des dizaines.
+            if (/\/wallet\/transaction-history/i.test(url) && Array.isArray(data?.data?.array)) {
+                const prev = DATA.rewards[key]?.data?.data?.array;
+                if (Array.isArray(prev)) {
+                    const r = mergePagedArray(prev, data.data.array, (x) => x.id, HISTORY_BYTE_BUDGET);
+                    data = JSON.parse(JSON.stringify(data));
+                    data.data.array = r.merged;
+                    log('Merge transactions: +' + r.added + ' nouvelles → ' + r.merged.length +
+                        ' au total' + (r.dropped ? ' (' + r.dropped + ' écartées, budget atteint)' : ''));
+                }
             }
 
             DATA.rewards[key] = {
