@@ -2715,3 +2715,18 @@ body.has-live-footer .main-content { padding-bottom: 64px; }
   .gms-welcome-back .gwb-changes { gap: 6px 12px; }
   .gms-welcome-back .gwb-changes li { font-size: .95rem; }
 }
+
+/* Lien de migration vers le store dans la bannière de mise à jour. */
+.gm-ext-banner-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+.gm-ext-banner-link:hover { text-decoration-thickness: 2px; }
+.gm-ext-banner-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 3px;
+}

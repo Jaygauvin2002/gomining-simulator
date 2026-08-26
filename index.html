@@ -632,17 +632,14 @@
             <span class="modal-close" onclick="document.getElementById('extension-guide').style.display='none'">&times;</span>
             <h2 data-i18n="guide_title">Chrome Extension Installation</h2>
             <div style="text-align:center;margin-bottom:20px;">
-                <a href="extension.zip" download="gmsim-miner-sync.zip" class="onboarding-btn" style="display:inline-block;text-decoration:none;" data-i18n="guide_download">⬇ Download Extension</a>
+                <a href="https://chromewebstore.google.com/detail/gmsim-%E2%80%94-miner-sync/llchhkfpkjbkiabpofbpfilicpbnihhp" target="_blank" rel="noopener" class="onboarding-btn" style="display:inline-block;text-decoration:none;" data-i18n="guide_store_cta">Install from the Chrome Web Store</a>
             </div>
             <div class="onboarding-steps">
-                <div class="onboarding-step"><span class="step-num">1</span><div data-i18n="guide_s1">Download and <strong>unzip</strong> the file above</div></div>
-                <div class="onboarding-step"><span class="step-num">2</span><div data-i18n="guide_s2">Open <strong>chrome://extensions/</strong> in your browser</div></div>
-                <div class="onboarding-step"><span class="step-num">3</span><div data-i18n="guide_s3">Enable <strong>"Developer mode"</strong> (toggle in the top right corner)</div></div>
-                <div class="onboarding-step"><span class="step-num">4</span><div data-i18n="guide_s4">Click <strong>"Load unpacked"</strong></div></div>
-                <div class="onboarding-step"><span class="step-num">5</span><div data-i18n="guide_s5">Select the <strong>extension/</strong> folder from the unzipped files</div></div>
-                <div class="onboarding-step"><span class="step-num">6</span><div data-i18n="guide_s6">Visit <strong>app.gomining.com</strong> — the extension icon should appear</div></div>
-                <div class="onboarding-step"><span class="step-num">7</span><div data-i18n="guide_s7">Navigate to your miner rewards page, then come back here. Data syncs automatically!</div></div>
+                <div class="onboarding-step"><span class="step-num">1</span><div data-i18n="guide_ns1">Click <strong>Add to Chrome</strong> on the store page that opens</div></div>
+                <div class="onboarding-step"><span class="step-num">2</span><div data-i18n="guide_ns2">Open <strong>app.gomining.com</strong> and sign in — the extension icon appears bottom-right</div></div>
+                <div class="onboarding-step"><span class="step-num">3</span><div data-i18n="guide_ns3">Visit your <strong>Rewards</strong> page once, then come back here. Everything syncs on its own from then on.</div></div>
             </div>
+            <p style="margin:18px 0 0;font-size:0.78em;line-height:1.5;color:var(--text-dim);text-align:center;" data-i18n="guide_store_note">Installing from the store means the extension updates itself — no reloading by hand, ever.</p>
         </div>
     </div>
 
@@ -4454,11 +4451,15 @@ function renderCalendar(history, chartEl) {
         // syncs update data + the Connection Pulse pill silently — users don't
         // want a popup every 30 seconds.
         let _firstSyncToastShown = false;
-        // Minimum extension version that includes the farm-power sanity bound.
-        // The extension reports its version in the sync payload (`extVersion`);
-        // anything older — or missing entirely (pre-reporting builds) — means the
-        // user is running a buggy/stale unpacked extension that won't auto-update.
-        const MIN_EXT_VERSION = '2.0';
+        // Minimum extension version we are willing to let people run.
+        // 2.4 is the first build that stops caching GoMining's sign-in response
+        // (which carried an e-mail address, login IP, KYC status and a live JWT).
+        // Anyone below it installed from the zip and gets no automatic updates,
+        // so this banner is now a migration path: it points them at the Chrome
+        // Web Store listing, where updates arrive on their own, and it clears
+        // itself the moment a 2.4+ build reports in.
+        const MIN_EXT_VERSION = '2.4';
+        const EXT_STORE_URL = 'https://chromewebstore.google.com/detail/gmsim-%E2%80%94-miner-sync/llchhkfpkjbkiabpofbpfilicpbnihhp';
         function extVersionOutdated(v) {
             if (!v) return true; // no version reported → pre-2.0 build
             const a = String(v).split('.').map(n => parseInt(n, 10) || 0);
@@ -4483,7 +4484,14 @@ function renderCalendar(history, chartEl) {
                 bar.id = 'gm-ext-update-banner';
                 bar.className = 'gm-ext-update-banner';
                 const span = document.createElement('span');
-                span.textContent = t('ext_update_msg');
+                span.textContent = t('ext_update_msg') + ' ';
+                const link = document.createElement('a');
+                link.href = EXT_STORE_URL;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.className = 'gm-ext-banner-link';
+                link.textContent = t('ext_update_cta');
+                span.appendChild(link);
                 const x = document.createElement('button');
                 x.type = 'button';
                 x.className = 'gm-ext-banner-x';
@@ -4858,7 +4866,8 @@ function renderCalendar(history, chartEl) {
                 onboard_btn: 'Get Started', onboard_guide: 'How to install the extension',
                 guide_title: 'Chrome Extension Installation',
                 guide_download: '⬇ Download Extension',
-                ext_update_msg: '⚠ Your GMSim extension is outdated. Open chrome://extensions, click 🔄 on the GMSim extension (older versions are listed as “GoMining Simulator”), then refresh this page — this fixes the farm-power display.',
+                ext_update_msg: '⚠ Your GMSim extension is out of date and will not update on its own. The Chrome Web Store version updates automatically — and this build no longer keeps a copy of your GoMining sign-in data.',
+                ext_update_cta: 'Install from the Chrome Web Store →',
                 guide_s1: 'Download and <strong>unzip</strong> the file above',
                 guide_s2: 'Open <strong>chrome://extensions/</strong> in your browser',
                 guide_s3: 'Enable <strong>"Developer mode"</strong> (toggle in the top right corner)',
@@ -4900,6 +4909,11 @@ function renderCalendar(history, chartEl) {
                 reco_at_current_prices: 'At current prices over',
                 sim_cum_profit: 'Cumulative 12-month profit', sim_optimistic: 'Optimistic', sim_pessimistic: 'Pessimistic', sim_final_th: 'Final TH',
                 sync_active: 'Auto-sync active', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync', sync_none: 'No sync', sync_last: 'Last sync', sync_stale: 'Data {n}d old — reopen GoMining to refresh',
+                guide_store_cta: 'Install from the Chrome Web Store',
+                guide_ns1: 'Click <strong>Add to Chrome</strong> on the store page that opens',
+                guide_ns2: 'Open <strong>app.gomining.com</strong> and sign in — the extension icon appears bottom-right',
+                guide_ns3: 'Visit your <strong>Rewards</strong> page once, then come back here. Everything syncs on its own from then on.',
+                guide_store_note: 'Installing from the store means the extension updates itself — no reloading by hand, ever.',
                 hist_uptodate: 'Up to date', hist_recent: 'Last solo sync', hist_days_ago: ' days ago',
                 hist_behind_pre: 'Solo history', hist_behind_post: 'd behind',
                 hist_behind_hint: 'Open GoMining\u2019s Rewards page to refresh — or, if you earn through Miner Wars, GMSim does not compute those rewards yet.',
@@ -5099,7 +5113,8 @@ function renderCalendar(history, chartEl) {
                 onboard_btn: 'Commencer', onboard_guide: "Comment installer l'extension",
                 guide_title: "Installation de l'extension Chrome",
                 guide_download: "⬇ Télécharger l'extension",
-                ext_update_msg: '⚠ Ton extension GMSim est obsolète. Va sur chrome://extensions, clique 🔄 sur l\'extension GMSim (les anciennes versions s\'appellent « GoMining Simulator »), puis rafraîchis cette page — ça corrige l\'affichage de la puissance.',
+                ext_update_msg: '⚠ Ton extension GMSim est obsolète et ne se mettra pas à jour toute seule. La version du Chrome Web Store se met à jour automatiquement — et elle ne conserve plus de copie de tes données de connexion GoMining.',
+                ext_update_cta: 'Installer depuis le Chrome Web Store →',
                 guide_s1: 'Téléchargez et <strong>décompressez</strong> le fichier ci-dessus',
                 guide_s2: 'Ouvrez <strong>chrome://extensions/</strong> dans votre navigateur',
                 guide_s3: 'Activez le <strong>"Mode développeur"</strong> (en haut à droite)',
@@ -5141,6 +5156,11 @@ function renderCalendar(history, chartEl) {
                 reco_at_current_prices: 'Aux prix actuels sur',
                 sim_cum_profit: 'Profit cumulé 12 mois', sim_optimistic: 'Optimiste', sim_pessimistic: 'Pessimiste', sim_final_th: 'TH final',
                 sync_active: 'Auto-sync actif', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync il y a', sync_none: 'Pas de sync', sync_last: 'Dernière sync', sync_stale: 'Données vieilles de {n}j — rouvre GoMining pour rafraîchir',
+                guide_store_cta: 'Installer depuis le Chrome Web Store',
+                guide_ns1: 'Clique <strong>Ajouter à Chrome</strong> sur la page du store qui s\'ouvre',
+                guide_ns2: 'Ouvre <strong>app.gomining.com</strong> et connecte-toi — l\'icône apparaît en bas à droite',
+                guide_ns3: 'Passe une fois sur ta page <strong>Rewards</strong>, puis reviens ici. Tout se synchronise ensuite tout seul.',
+                guide_store_note: 'Installée depuis le store, l\'extension se met à jour toute seule — plus jamais de rechargement à la main.',
                 hist_uptodate: 'À jour', hist_recent: 'Dernière sync solo', hist_days_ago: ' jours',
                 hist_behind_pre: 'Historique solo', hist_behind_post: 'j de retard',
                 hist_behind_hint: 'Ouvre la page Rewards de GoMining pour rafraîchir — ou, si tes gains passent par Miner Wars, GMSim ne calcule pas encore ces revenus.',
