@@ -1131,6 +1131,14 @@
         //     than what we summed per-NFT, prefer it — the user-facing
         //     UI almost always pulls from such a dedicated total endpoint
         //     when it exists.
+        // TODO(bonus-miner) : ajouter la puissance du Bonus miner à
+        // result.miner.power. Il vient de bonus-miner/client/find-one, qui est
+        // désormais capté mais dont on ne connaît pas encore les noms de champs
+        // — le payload avait été jeté par la liste blanche avant qu'on l'examine.
+        // Chez Jérémie c'est 0,40 TH, exactement l'écart entre 696,82 affichés
+        // par GoMining et 696,42 sommés depuis /nft/get-my. Câbler seulement
+        // après avoir vu une capture : deviner un nom de champ, c'est refaire
+        // l'erreur du scraping DOM sous une autre forme.
         const anchor = result.miner.apiPower || 0; // base Σ(n.power)
 
         // Σ(n.power) issu de /nft/get-my fait FOI quand il existe.
