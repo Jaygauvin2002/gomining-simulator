@@ -2730,3 +2730,15 @@ body.has-live-footer .main-content { padding-bottom: 64px; }
   outline-offset: 2px;
   border-radius: 3px;
 }
+
+/* Note sous le capital externe : explique pourquoi le P&L est vide, ou sur
+   quelle base il est estimé. Un chiffre absent avec sa raison vaut mieux
+   qu'un chiffre faux sans explication. */
+.port-capital-note {
+  margin-top: 6px;
+  font-size: .72rem;
+  line-height: 1.4;
+  font-weight: 400;
+  color: var(--warn, #e0a342);
+  max-width: 34ch;
+}

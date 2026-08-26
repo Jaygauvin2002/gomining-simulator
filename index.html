@@ -1516,14 +1516,15 @@
                 </div>
                 <div class="port-hero-grid">
                     <div class="port-stat port-stat--invested">
-                        <div class="port-stat-label" data-i18n="port_total_invested">Total Invested</div>
+                        <div class="port-stat-label" data-i18n="port_total_invested">External Capital</div>
                         <div class="port-stat-value" id="port-total-invested">--</div>
+                        <div class="port-stat-sub port-capital-note" id="port-capital-note" style="display:none;"></div>
                     </div>
                     <div class="port-stat port-stat--pnl">
                         <div class="port-stat-label" data-i18n="port_pnl">Profit / Loss</div>
                         <div class="port-stat-value" id="port-pnl">--</div>
-                        <div class="port-stat-sub">
-                            <span data-i18n="port_roi_label">ROI</span>
+                        <div class="port-stat-sub" title="100% = capital fully recovered">
+                            <span data-i18n="port_recovered_label">Recovered</span>
                             <strong id="port-roi">--</strong>
                         </div>
                     </div>
@@ -1547,6 +1548,10 @@
                 <div class="port-kpi">
                     <div class="port-kpi-label" data-i18n="port_daily_avg">Avg Gain / Day</div>
                     <div class="port-kpi-value" id="port-daily-avg" style="color:var(--green);">--</div>
+                </div>
+                <div class="port-kpi">
+                    <div class="port-kpi-label" data-i18n="port_cost_per_th">Cost / TH</div>
+                    <div class="port-kpi-value" id="port-cost-per-th" style="color:var(--accent2);">--</div>
                 </div>
                 <div class="port-kpi">
                     <div class="port-kpi-label" data-i18n="port_payback">Investment Payback</div>
@@ -1585,6 +1590,7 @@
                         <div class="form-group">
                             <label data-i18n="lbl_category">Category</label>
                             <select id="tx-category">
+                                <option value="deposit" data-i18n="cat_deposit">💵 Deposit (money in)</option>
                                 <option value="nft" data-i18n="cat_nft">⛏ Buy NFT</option>
                                 <option value="upgrade" data-i18n="cat_upgrade">⬆ Upgrade TH</option>
                                 <option value="upgrade-wth" data-i18n="cat_upgrade_wth">⚡ Upgrade W/TH</option>
@@ -4849,7 +4855,7 @@ function renderCalendar(history, chartEl) {
                 cat_nft: '⛏ Buy NFT', cat_upgrade: '⬆ Upgrade TH', cat_upgrade_wth: '⚡ Upgrade W/TH', cat_lock: '🔒 Lock GMT', cat_staking: '💎 Staking veGMT', cat_other: '📦 Other',
                 cat_nft_label: 'Buy NFT', cat_upgrade_label: 'Upgrade TH', cat_upgrade_wth_label: 'Upgrade W/TH',
                 cat_lock_label: 'Lock GMT', cat_staking_label: 'Staking veGMT', cat_other_label: 'Other',
-                port_total_invested: 'Total Invested', port_cumulative: 'Cumulative Gains',
+                port_total_invested: 'External Capital', port_cumulative: 'Cumulative Gains',
                 port_pnl: 'Profit / Loss', port_roi_label: 'ROI',
                 port_active_days: 'Active Days', port_daily_avg: 'Avg Gain / Day',
                 port_payback: 'Investment Payback', port_asset_value: 'Asset Value', port_paid_back: 'Paid Back!',
@@ -4909,6 +4915,12 @@ function renderCalendar(history, chartEl) {
                 reco_at_current_prices: 'At current prices over',
                 sim_cum_profit: 'Cumulative 12-month profit', sim_optimistic: 'Optimistic', sim_pessimistic: 'Pessimistic', sim_final_th: 'Final TH',
                 sync_active: 'Auto-sync active', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync', sync_none: 'No sync', sync_last: 'Last sync', sync_stale: 'Data {n}d old — reopen GoMining to refresh',
+                cat_deposit_label: 'Deposit (money in)',
+                cat_deposit: '💵 Deposit (money in)',
+                port_recovered_label: 'Recovered',
+                port_cost_per_th: 'Cost / TH',
+                port_need_deposit: 'Add a Deposit entry — only money from outside counts as capital.',
+                port_capital_fallback: 'Estimated from purchases. Log your deposits for an exact figure.',
                 guide_store_cta: 'Install from the Chrome Web Store',
                 guide_ns1: 'Click <strong>Add to Chrome</strong> on the store page that opens',
                 guide_ns2: 'Open <strong>app.gomining.com</strong> and sign in — the extension icon appears bottom-right',
@@ -5096,7 +5108,7 @@ function renderCalendar(history, chartEl) {
                 cat_lock: '🔒 Lock GMT', cat_staking: '💎 Staking veGMT', cat_other: '📦 Autre',
                 cat_nft_label: 'Achat NFT', cat_upgrade_label: 'Upgrade TH', cat_upgrade_wth_label: 'Upgrade W/TH',
                 cat_lock_label: 'Lock GMT', cat_staking_label: 'Staking veGMT', cat_other_label: 'Autre',
-                port_total_invested: 'Total investi', port_cumulative: 'Gains cumulés',
+                port_total_invested: 'Capital externe', port_cumulative: 'Gains cumulés',
                 port_pnl: 'Profit / Perte', port_roi_label: 'ROI',
                 port_active_days: 'Jours actifs', port_daily_avg: 'Gain moyen / jour',
                 port_payback: 'Retour investissement', port_asset_value: 'Valeur actifs', port_paid_back: 'Remboursé !',
@@ -5156,6 +5168,12 @@ function renderCalendar(history, chartEl) {
                 reco_at_current_prices: 'Aux prix actuels sur',
                 sim_cum_profit: 'Profit cumulé 12 mois', sim_optimistic: 'Optimiste', sim_pessimistic: 'Pessimiste', sim_final_th: 'TH final',
                 sync_active: 'Auto-sync actif', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync il y a', sync_none: 'Pas de sync', sync_last: 'Dernière sync', sync_stale: 'Données vieilles de {n}j — rouvre GoMining pour rafraîchir',
+                cat_deposit_label: 'Dépôt (argent entrant)',
+                cat_deposit: '💵 Dépôt (argent entrant)',
+                port_recovered_label: 'Récupéré',
+                port_cost_per_th: 'Coût / TH',
+                port_need_deposit: 'Ajoute une ligne Dépôt — seul l\'argent venu de l\'extérieur compte comme capital.',
+                port_capital_fallback: 'Estimé d\'après tes achats. Saisis tes dépôts pour un chiffre exact.',
                 guide_store_cta: 'Installer depuis le Chrome Web Store',
                 guide_ns1: 'Clique <strong>Ajouter à Chrome</strong> sur la page du store qui s\'ouvre',
                 guide_ns2: 'Ouvre <strong>app.gomining.com</strong> et connecte-toi — l\'icône apparaît en bas à droite',
@@ -5412,6 +5430,11 @@ function renderCalendar(history, chartEl) {
         const TX_KEY = 'gomining_transactions';
         function getCatMeta() {
             return {
+                // Seule catégorie qui compte comme CAPITAL. Toutes les autres sont
+                // des emplois d'argent : un mineur payé avec du GMT miné n'est pas
+                // un investissement, il a déjà été compté comme gain le jour où il
+                // a été miné. Les additionner gonflait le dénominateur du ROI.
+                deposit: { label: t('cat_deposit_label'), icon: '💵' },
                 nft:     { label: t('cat_nft_label'), icon: '⛏' },
                 upgrade: { label: t('cat_upgrade_label'), icon: '⬆' },
                 'upgrade-wth': { label: t('cat_upgrade_wth_label'), icon: '⚡' },
@@ -5572,12 +5595,18 @@ function renderCalendar(history, chartEl) {
 
             // Totals per category
             const totals = {};
-            let invested = 0;
+            let capital = 0;   // argent venu de l'extérieur — le seul dénominateur légitime
+            let spent = 0;     // emplois : achats, upgrades, lock… peu importe la source
             Object.keys(CAT_META).forEach(k => totals[k] = 0);
             txs.forEach(t => {
                 totals[t.category] = (totals[t.category] || 0) + t.amount;
-                invested += t.amount;
+                if (t.category === 'deposit') capital += t.amount; else spent += t.amount;
             });
+            // Repli pour les portefeuilles saisis avant l'existence de la catégorie
+            // « dépôt » : on prend la somme des achats, faute de mieux, et on le dit.
+            const capitalIsFallback = capital === 0 && spent > 0;
+            if (capitalIsFallback) capital = spent;
+            const invested = capital;
 
             // Days since first activity — earliest of (first transaction) and (first synced reward day).
             // For users without manual transactions, falls back to reward history so the metric
@@ -5605,19 +5634,67 @@ function renderCalendar(history, chartEl) {
             }
             if (cumUsd === 0 && currentDailyUsd > 0) cumUsd = currentDailyUsd * days;
 
-            const pnl = cumUsd - invested;
-            const roi = invested > 0 ? (pnl / invested * 100) : 0;
+            // === P&L : modèle « frontière » ===
+            //
+            // L'ancien calcul faisait `pnl = cumUsd - invested`, soit les revenus
+            // de minage moins le capital — en ignorant complètement le fait que
+            // les mineurs sont toujours détenus. D'où un P&L de −3 204 $ et un ROI
+            // de −77 % affichés à côté d'un actif de 12 664 $, trois chiffres qui
+            // ne pouvaient pas coexister.
+            //
+            // On ne compte donc que ce qui franchit la frontière du compte : le
+            // capital entré d'un côté, la valeur détenue plus ce qui est sorti de
+            // l'autre. Et surtout on n'additionne PAS les revenus cumulés à la
+            // valeur de l'actif : les gains réinvestis sont déjà DANS l'actif sous
+            // forme de TH, les compter deux fois était l'erreur inverse.
+            const thNow = parseFloat(document.getElementById('hashrate')?.value) || 0;
+            const thCost = parseFloat(document.getElementById('cost-per-th-upgrade')?.value) || 12.34;
+            const lockedGmt = parseFloat(document.getElementById('gmt-locked')?.value) || 0;
+            const assetValue = thNow * thCost + lockedGmt * (state.gmtPrice || 0);
+            const withdrawn = 0; // aucune sortie détectée pour l'instant (voir ledger)
+
+            const pnl = assetValue + withdrawn - capital;
+            // Convention demandée : 100 % = investissement intégralement récupéré.
+            // En dessous de 100 %, la mise n'est pas encore revenue ; au-dessus,
+            // c'est du profit. Plus lisible qu'un ROI centré sur zéro pour une
+            // position que l'on détient toujours.
+            const recovery = capital > 0 ? ((assetValue + withdrawn) / capital * 100) : null;
             const dailyAvg = cumUsd / days;
 
             // KPIs
-            document.getElementById('port-total-invested').textContent = formatUSD(invested);
+            document.getElementById('port-total-invested').textContent =
+                capital > 0 ? formatUSD(capital) : '--';
             document.getElementById('port-cumulative').textContent = formatUSD(cumUsd);
+
             const pnlEl = document.getElementById('port-pnl');
-            pnlEl.textContent = (pnl >= 0 ? '+' : '') + formatUSD(pnl);
-            pnlEl.className = 'value ' + (pnl >= 0 ? 'positive' : 'negative');
             const roiEl = document.getElementById('port-roi');
-            roiEl.textContent = roi.toFixed(1) + '%';
-            roiEl.className = 'value ' + (roi >= 0 ? 'positive' : 'negative');
+            if (capital > 0) {
+                pnlEl.textContent = (pnl >= 0 ? '+' : '') + formatUSD(pnl);
+                pnlEl.className = 'value ' + (pnl >= 0 ? 'positive' : 'negative');
+                roiEl.textContent = recovery.toFixed(0) + '%';
+                roiEl.className = 'value ' + (recovery >= 100 ? 'positive' : 'negative');
+            } else {
+                // Mieux vaut ne rien afficher qu'un chiffre faux : sans capital
+                // connu, aucun P&L n'a de sens.
+                pnlEl.textContent = '--';
+                pnlEl.className = 'value';
+                roiEl.textContent = '--';
+                roiEl.className = 'value';
+            }
+            const capNote = document.getElementById('port-capital-note');
+            if (capNote) {
+                capNote.textContent = capital === 0
+                    ? t('port_need_deposit')
+                    : (capitalIsFallback ? t('port_capital_fallback') : '');
+                capNote.style.display = capNote.textContent ? '' : 'none';
+            }
+
+            const cptEl = document.getElementById('port-cost-per-th');
+            if (cptEl) {
+                cptEl.textContent = (capital > 0 && thNow > 0)
+                    ? formatUSD(capital / thNow) : '--';
+            }
+
             document.getElementById('port-days').textContent = days + 'j';
             document.getElementById('port-daily-avg').textContent = formatUSD(dailyAvg);
 
@@ -5645,11 +5722,10 @@ function renderCalendar(history, chartEl) {
                 payEl.textContent = 'N/A';
             }
 
-            // Asset value
-            const hashrate = parseFloat(document.getElementById('hashrate')?.value) || 0;
-            const costPerTH = parseFloat(document.getElementById('cost-per-th-upgrade')?.value) || 12.34;
-            const gmtLocked = parseFloat(document.getElementById('gmt-locked')?.value) || 0;
-            document.getElementById('port-asset-value').textContent = formatUSD(hashrate * costPerTH + gmtLocked * (state.gmtPrice || 0));
+            // Valeur d'actif — déjà calculée plus haut pour le P&L, on ne la
+            // recalcule pas : deux formules pour un même chiffre finissent
+            // toujours par diverger.
+            document.getElementById('port-asset-value').textContent = formatUSD(assetValue);
 
             // Breakdown par catégorie
             const bdCatMeta = getCatMeta();
