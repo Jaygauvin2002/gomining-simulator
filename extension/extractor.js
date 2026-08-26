@@ -1259,6 +1259,11 @@
                         reinvestCommissionBtc: sumReinvestCommission,
                         totalDiscount: main.totalDiscount,
                         gmtPrice: day.incomeStatistic?.gmtPrice,
+                        // Tarif électrique officiel de GoMining pour ce jour-là.
+                        // C'était le dernier paramètre encore saisi à la main, et
+                        // celui de Jérémie était à $0,06 contre $0,05 réels — 20 %
+                        // d'écart sur la moitié de ses frais.
+                        elecCostKwh: day.incomeStatistic?.kilowattHour,
                         btcPrice: day.incomeStatistic?.btcCourseInUsd,
                         maintenanceGmt: sumMaintGmt,
                         gmtIncome: sumGmtIncome,
@@ -1301,6 +1306,10 @@
             if (!result.prices.btcPrice && latest.btcPrice) {
                 result.prices.btcPrice = latest.btcPrice;
                 result.prices.btcPriceSource = 'reward-history';
+            }
+
+            if (completeDay && completeDay.elecCostKwh > 0) {
+                result.income.elecCostKwh = completeDay.elecCostKwh;
             }
 
             // Termes complémentaires du dernier jour complet, en unités réutilisables :

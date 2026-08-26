@@ -935,7 +935,7 @@
                         <div class="form-group">
                             <label data-i18n="lbl_elec_cost">Electricity Cost ($/kWh)</label>
                             <input type="number" id="elec-cost" value="0.05" min="0.01" max="0.20" step="0.001">
-                            <span class="hint" data-i18n="hint_elec_cost">GoMining: $0.05 - $0.07</span>
+                            <span class="hint" data-i18n="hint_elec_cost">Auto-filled from GoMining&#39;s own rate</span>
                         </div>
                         <div class="discount-group">
                             <div class="discount-group-header">
@@ -3446,6 +3446,14 @@
 
             // Termes complémentaires de la formule GoMining, mesurés sur le dernier
             // jour complet : bonus GoBTC Pay et commission de réinvestissement.
+            // Tarif électrique : GoMining le publie dans incomeStatistic.kilowattHour.
+            // C'était le dernier paramètre laissé à la saisie manuelle, et une
+            // valeur erronée y pèse lourd — $0,06 au lieu de $0,05 retirait 20 %
+            // sur la moitié des frais, soit $2,30/jour sur cette ferme.
+            if (data.income?.elecCostKwh > 0) {
+                const el = document.getElementById('elec-cost');
+                if (el) el.value = data.income.elecCostKwh;
+            }
             if (data.income?.gbpSatPerTh !== undefined) state.gbpSatPerTh = data.income.gbpSatPerTh;
             if (data.income?.reinvestCommissionRate !== undefined) state.reinvestCommissionRate = data.income.reinvestCommissionRate;
 
@@ -4860,7 +4868,7 @@ function renderCalendar(history, chartEl) {
                 lbl_hashrate: 'Hashrate (TH/s)', lbl_efficiency: 'Energy Efficiency (W/TH)', lbl_elec_cost: 'Electricity Cost ($/kWh)',
                 lbl_gmt_wallet: 'GMT in Wallet', lbl_gmt_locked: 'GMT Locked (tokenomics)', lbl_sat_per_th: 'sat/TH/day (PR)',
                 hint_hashrate: '1 TH/s (level 1) to 5000 TH/s (level 20)', hint_efficiency: '15 W/TH (best) to 50 W/TH (worst)',
-                hint_elec_cost: 'GoMining: $0.05 - $0.07', hint_gmt_wallet: 'Virtual GMT wallet balance',
+                hint_elec_cost: 'Auto-filled from GoMining\'s own rate', hint_gmt_wallet: 'Virtual GMT wallet balance',
                 hint_gmt_locked: 'Tokens locked in veGOMINING', hint_sat_per_th: 'Auto-calculated — manually adjustable from your dashboard',
                 // Result cards
                 res_gross_day: 'Gross Revenue / Day', res_fees_day: 'Fees / Day', res_net_day: 'Net Profit / Day',
@@ -5115,7 +5123,7 @@ function renderCalendar(history, chartEl) {
                 lbl_hashrate: 'Puissance de calcul (TH/s)', lbl_efficiency: 'Efficacité énergétique (W/TH)', lbl_elec_cost: 'Coût électricité ($/kWh)',
                 lbl_gmt_wallet: 'GMT dans le wallet', lbl_gmt_locked: 'GMT locked (tokenomics)', lbl_sat_per_th: 'sat/TH/jour (PR)',
                 hint_hashrate: '1 TH/s (niveau 1) à 5000 TH/s (niveau 20)', hint_efficiency: '15 W/TH (meilleur) à 50 W/TH (pire)',
-                hint_elec_cost: 'GoMining : $0.05 - $0.07', hint_gmt_wallet: 'Balance GMT virtuel wallet',
+                hint_elec_cost: 'Renseigné automatiquement au tarif GoMining', hint_gmt_wallet: 'Balance GMT virtuel wallet',
                 hint_gmt_locked: 'Tokens lockés en veGOMINING', hint_sat_per_th: 'Auto-calculé — ajustable manuellement depuis ton dashboard',
                 // Result cards
                 res_gross_day: 'Revenu brut / jour', res_fees_day: 'Frais / jour', res_net_day: 'Profit net / jour',
