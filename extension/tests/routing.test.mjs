@@ -140,9 +140,28 @@ check(storable(HIST), 'historique : doit rester stockable (il va dans DATA.rewar
 // nft/get-my doit, lui, rester dans les pools solo.
 check(SOLO.test(API + 'nft/get-my'), 'nft/get-my doit passer par isSoloMinerUrl');
 
-// La coupe à 30 jours doit être appliquée au STOCKAGE, pas seulement à la synchro.
-check(/keepFrom/.test(SRC) && /MAX_HISTORY_DAYS \* 24 \* 3600 \* 1000/.test(SRC),
-      'la fusion de l’historique doit élaguer à MAX_HISTORY_DAYS');
+// Le stockage de l'historique doit être borné — sinon il grossit de ~100 Ko par
+// jour jusqu'à saturer le quota de chrome.storage.local, et un set() en échec
+// arrête la synchro sans rien dire.
+check(/HISTORY_BYTE_BUDGET/.test(SRC), 'la fusion de l’historique doit être bornée par HISTORY_BYTE_BUDGET');
+check((SRC.match(/HISTORY_BYTE_BUDGET/g) || []).length >= 2,
+      'HISTORY_BYTE_BUDGET doit être défini ET utilisé dans la fusion');
+
+// Et cette borne doit être une borne de TAILLE, jamais une coupe par date.
+// Une première version coupait à MAX_HISTORY_DAYS : chez un utilisateur passé
+// par Miner Wars, dont l'historique solo s'interrompt pendant des semaines,
+// elle supprimait la totalité des jours réels et ne gardait que la journée
+// courante. La fenêtre de 30 jours ne concerne QUE la charge envoyée au
+// simulateur (extractEssentials), pas ce qu'on conserve.
+const mergeBlock = (() => {
+  const i = SRC.indexOf('Merge reward history:');
+  const start = SRC.lastIndexOf('data = JSON.parse(JSON.stringify(data));', i);
+  return start >= 0 ? SRC.slice(start, i) : '';
+})();
+check(mergeBlock.length > 0, 'bloc de fusion de l’historique introuvable');
+check(!/MAX_HISTORY_DAYS/.test(mergeBlock),
+      'la fusion ne doit PAS couper par date (MAX_HISTORY_DAYS est la fenêtre de synchro, pas de stockage)');
+check(/HISTORY_BYTE_BUDGET/.test(mergeBlock), 'la fusion doit consommer HISTORY_BYTE_BUDGET');
 
 // prices.raw ne doit être gardé que pour une vraie source de prix.
 check(/isPriceSource/.test(SRC), 'prices.raw doit être restreint aux sources de prix');

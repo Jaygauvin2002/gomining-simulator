@@ -5,7 +5,12 @@
     'use strict';
 
     const MAX_AGE_HOURS = 24; // Durée de vie max des données
-    const MAX_HISTORY_DAYS = 30; // Garder seulement 30 jours de reward history
+    const MAX_HISTORY_DAYS = 30; // Fenêtre envoyée au simulateur
+    // Plafond de ce qu'on CONSERVE en local. 2,5 Mo laisse largement la place
+    // au reste (nft/get-my ~45 Ko, portefeuille, prix) sous le quota de 10 Mo
+    // de chrome.storage.local, tout en gardant des mois d'historique réel :
+    // les jours ne pèsent lourd que lorsqu'ils contiennent des revenus.
+    const HISTORY_BYTE_BUDGET = 2_500_000;
     const AUTOSYNC_DEBOUNCE_MS = 30000; // 30 seconds debounce for auto-sync
     const AUTOSYNC_FIRST_MS = 3000; // 3 seconds for first sync
 
@@ -301,19 +306,39 @@
                     if (dt) byDate.set(dt, d); // nouvelles données ont priorité
                 }
                 data = JSON.parse(JSON.stringify(data));
-                // Élaguer ce qui est STOCKÉ, pas seulement ce qui est synchronisé.
-                // Chaque jour pèse ~56 Ko (détail par NFT) et la fusion dédoublonne
-                // par date sans jamais rien jeter : sans cette coupe, la clé grossit
-                // de 56 Ko/jour jusqu'à saturer le quota de chrome.storage.local
-                // (10 Mo, l'extension ne demande pas unlimitedStorage) — après quoi
-                // les écritures échouent et la synchro s'arrête en silence.
-                const keepFrom = new Date(Date.now() - MAX_HISTORY_DAYS * 24 * 3600 * 1000)
-                    .toISOString().substring(0, 10);
-                data.data.array = Array.from(byDate.values())
-                    .filter(dd => (dd.createdAt || '').substring(0, 10) >= keepFrom)
+
+                // Borner ce qui est STOCKÉ, pas seulement ce qui est synchronisé.
+                // La fusion dédoublonne par date et ne jetait jamais rien : à
+                // ~100 Ko par jour de détail par NFT, la clé grossissait sans fin
+                // jusqu'à saturer le quota de chrome.storage.local (10 Mo, on ne
+                // demande pas unlimitedStorage) — et un set() qui échoue arrête la
+                // synchro en silence.
+                //
+                // On borne par TAILLE et non par âge, en gardant les jours les plus
+                // récents. Une coupe par date paraissait plus simple mais détruisait
+                // de vraies données : un utilisateur passé par Miner Wars a un trou
+                // dans son historique solo, si bien que ses seuls jours réels
+                // pouvaient tous être antérieurs au seuil. Et la synchro cloud
+                // prévue vise justement à dépasser la fenêtre de 30 jours — inutile
+                // de détruire d'avance ce qu'elle voudra lire.
+                const sortedDesc = Array.from(byDate.values())
+                    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+                const kept = [];
+                let budget = HISTORY_BYTE_BUDGET;
+                for (const day of sortedDesc) {
+                    const cost = JSON.stringify(day).length;
+                    // Toujours garder le jour le plus récent, même s'il dépasse à lui
+                    // seul le budget : sans lui il n'y a plus de synchro du tout.
+                    if (kept.length && cost > budget) break;
+                    kept.push(day);
+                    budget -= cost;
+                }
+                const dropped = sortedDesc.length - kept.length;
+                data.data.array = kept
                     .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
                 log('Merge reward history: ' + existing.length + ' + ' + newDays.length +
-                    ' → ' + data.data.array.length + ' jours (coupe à ' + MAX_HISTORY_DAYS + 'j)');
+                    ' → ' + data.data.array.length + ' jours' +
+                    (dropped ? ' (' + dropped + ' plus anciens écartés, budget atteint)' : ''));
             }
 
             DATA.rewards[key] = {
