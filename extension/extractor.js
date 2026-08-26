@@ -343,6 +343,24 @@
         return { merged: kept, added: added, dropped: desc.length - kept.length };
     }
 
+    // Lit le Bonus miner dans les réponses captées. Repéré par URL plutôt que
+    // par clé de stockage : extractEndpointKey ne garde que les deux derniers
+    // segments, donc il est rangé sous « client/find-one » — un nom qui ne dit
+    // rien de son origine et qu'un autre service pourrait un jour réutiliser.
+    function findBonusMiner() {
+        for (const pool of [DATA.miners, DATA.rewards]) {
+            for (const entry of Object.values(pool || {})) {
+                if (!/bonus-miner/i.test(entry?.url || '')) continue;
+                const m = entry?.data?.data?.miner;
+                if (!m) continue;
+                const power = Number(m.power);
+                if (!isFinite(power) || power <= 0) continue;
+                return { power: power, efficiency: Number(m.energy_efficiency) || null };
+            }
+        }
+        return null;
+    }
+
     // === Analyser les réponses API ===
     function analyzeResponse(url, data) {
         // Rien n'est stocké hors de la liste blanche — voir isStorableUrl().
@@ -893,6 +911,31 @@
                     fieldSums: sums              // all field sums (visible in JSON export for debug)
                 };
                 try { console.log('[GMSim Sync] Power per field:', sums, '→ chosen:', totalPower, 'via', powerField); } catch {}
+
+                // Le Bonus miner est un vrai mineur, avec sa propre puissance et
+                // ses propres récompenses, servi par api.bonus-miner.gomining.com
+                // et ABSENT de /nft/get-my. Sans lui la ferme est sous-comptée :
+                // chez Jérémie 696,4212 sommés contre 696,82 affichés par
+                // GoMining, et 696,4212 + 0,3972 = 696,8184 — l'écart restant
+                // (0,0016) est l'arrondi de l'affichage.
+                //
+                // C'est très probablement ce mineur que le scan global et le
+                // scraping du DOM tentaient de deviner depuis mai. Les noms de
+                // champs sont en snake_case : autre service, autre convention.
+                const bonus = findBonusMiner();
+                if (bonus && bonus.power > 0) {
+                    const withBonus = result.miner.power + bonus.power;
+                    // L'efficacité de la ferme est pondérée par la puissance.
+                    const watts = result.miner.power * result.miner.energyEfficiency
+                                + bonus.power * (bonus.efficiency || result.miner.energyEfficiency);
+                    result.miner.power = withBonus;
+                    result.miner.energyEfficiency = withBonus > 0 ? watts / withBonus : result.miner.energyEfficiency;
+                    result.miner.apiPower = (result.miner.apiPower || 0) + bonus.power;
+                    result.miner.minerCount = (result.miner.minerCount || 0) + 1;
+                    result.miner.bonusMinerPower = bonus.power;
+                    result.miner.powerSource = 'api+bonus';
+                    try { console.log('[GMSim Sync] Bonus miner: +' + bonus.power + ' TH → ' + withBonus); } catch {}
+                }
             }
             if (m.url?.includes('/wallet/find-by-user') && m.data?.data?.array) {
                 const gmtW = m.data.data.array.find(w => w.type === 'VIRTUAL_GMT');
@@ -1131,14 +1174,6 @@
         //     than what we summed per-NFT, prefer it — the user-facing
         //     UI almost always pulls from such a dedicated total endpoint
         //     when it exists.
-        // TODO(bonus-miner) : ajouter la puissance du Bonus miner à
-        // result.miner.power. Il vient de bonus-miner/client/find-one, qui est
-        // désormais capté mais dont on ne connaît pas encore les noms de champs
-        // — le payload avait été jeté par la liste blanche avant qu'on l'examine.
-        // Chez Jérémie c'est 0,40 TH, exactement l'écart entre 696,82 affichés
-        // par GoMining et 696,42 sommés depuis /nft/get-my. Câbler seulement
-        // après avoir vu une capture : deviner un nom de champ, c'est refaire
-        // l'erreur du scraping DOM sous une autre forme.
         const anchor = result.miner.apiPower || 0; // base Σ(n.power)
 
         // Σ(n.power) issu de /nft/get-my fait FOI quand il existe.

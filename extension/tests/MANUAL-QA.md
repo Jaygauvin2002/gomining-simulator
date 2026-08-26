@@ -8,6 +8,7 @@ qu'une fois cette liste terminée — pas de patch du patch en production.
 ```
 node extension/tests/routing.test.mjs
 node extension/tests/merge.test.mjs
+node extension/tests/bonus-miner.test.mjs
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -49,6 +50,10 @@ Clique **Exporter JSON** dans le panneau, puis vérifie :
 - [ ] `nft-income/find-aggregated-by-date` présent **dans `rewards` seulement**,
       jamais dans `miners`
 - [ ] au plus 30 jours dans `rewards[...].data.data.array`
+- [ ] `client/find-one` présent — c'est le **Bonus miner**, rangé sous ce nom
+      parce que la clé ne garde que les deux derniers segments d'URL
+- [ ] la puissance affichée dans GMSim égale celle du widget « Mining farm »
+      de GoMining, bonus inclus
 - [ ] `wallet/find-by-user` présent (soldes)
 - [ ] `home-page/get-info-v2` présent (prix)
 - [ ] **aucune** entrée `auth/`, `i18n`, `banner-configuration`,
@@ -78,6 +83,7 @@ Bumper la version dans `manifest.json`, puis :
 ./extension/build-zip.sh
 node extension/tests/routing.test.mjs
 node extension/tests/merge.test.mjs
+node extension/tests/bonus-miner.test.mjs
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le
