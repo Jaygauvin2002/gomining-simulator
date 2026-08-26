@@ -5105,7 +5105,7 @@ function renderCalendar(history, chartEl) {
                 port_avg_window: 'Over the last {n} measured day(s)',
                 port_avg_calc: 'No measured day yet — calculated rate',
                 port_pct_year: '%/year',
-                port_bd_ledger: 'Filled in from your GoMining transactions — nothing to enter by hand. Manual entries stay in the table below and are not counted twice.',
+                port_bd_ledger: 'Filled in from your GoMining transactions — nothing to enter by hand. Percentages are shares of what you spent; deposits are the capital it came from. Manual entries stay in the table below and are not counted twice.',
                 port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
                 port_bd_no_cats: 'captured before categorisation existed — reload the extension',
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
@@ -5371,7 +5371,7 @@ function renderCalendar(history, chartEl) {
                 port_avg_window: 'Sur les {n} dernier(s) jour(s) mesuré(s)',
                 port_avg_calc: 'Aucun jour mesuré — rythme calculé',
                 port_pct_year: ' %/an',
-                port_bd_ledger: 'Rempli depuis tes transactions GoMining — rien à saisir. Tes lignes manuelles restent dans la table ci-dessous et ne sont pas comptées deux fois.',
+                port_bd_ledger: 'Rempli depuis tes transactions GoMining — rien à saisir. Les pourcentages sont des parts de ce que tu as dépensé ; les dépôts sont le capital d\'où ça vient. Tes lignes manuelles restent dans la table et ne sont pas comptées deux fois.',
                 port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
                 port_bd_no_cats: 'capturé avant la catégorisation — recharge l\'extension',
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
@@ -6055,9 +6055,19 @@ function renderCalendar(history, chartEl) {
             const ledgerCats = state.capital?.byCategory;
             const bdFromLedger = !!ledgerCats && Object.keys(ledgerCats).length > 0;
             const gmtP = state.gmtPrice || 0;
-            const bdTotal = bdFromLedger
-                ? Object.values(ledgerCats).reduce((a, c) => a + (c.gmt || 0), 0) * gmtP
-                : invested;
+
+            // Le dépôt est de l'argent qui ENTRE, les autres catégories de l'argent
+            // qui SORT. Les additionner pour en faire un dénominateur commun n'a
+            // aucun sens : ça faisait peser le dépôt « 50 % » d'un total qui ne
+            // représentait rien. On rapporte donc chaque dépense au total DÉPENSÉ,
+            // et le dépôt à rien du tout — c'est le capital, pas une part de gâteau.
+            const bdSpendTotal = bdFromLedger
+                ? Object.entries(ledgerCats)
+                    .filter(([cat]) => cat !== 'deposit')
+                    .reduce((a, [, c]) => a + (c.gmt || 0), 0) * gmtP
+                : Object.entries(totals)
+                    .filter(([cat]) => cat !== 'deposit')
+                    .reduce((a, [, v]) => a + (v || 0), 0);
 
             const bdCatMeta = getCatMeta();
             let bdHtml = '<div class="live-data" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">';
@@ -6065,15 +6075,19 @@ function renderCalendar(history, chartEl) {
                 const meta = bdCatMeta[cat];
                 const led = bdFromLedger ? ledgerCats[cat] : null;
                 const val = bdFromLedger ? (led ? led.gmt * gmtP : 0) : (totals[cat] || 0);
-                const pct = bdTotal > 0 ? (val / bdTotal * 100).toFixed(0) : 0;
                 const count = bdFromLedger
                     ? (led ? led.txCount : 0)
                     : txs.filter(t => t.category === cat).length;
+                // Pas de pourcentage sur le dépôt : il n'est pas une part d'un
+                // ensemble, c'est le capital dont tout le reste est issu.
+                const pctLabel = (cat === 'deposit' || bdSpendTotal <= 0)
+                    ? ''
+                    : (val / bdSpendTotal * 100).toFixed(0) + '% · ';
                 bdHtml += `<div class="live-card" style="text-align:center;">
                     <div style="font-size:1.5em;margin-bottom:4px;">${meta.icon}</div>
                     <div class="label">${meta.label}</div>
                     <div style="font-size:1.2em;font-weight:700;margin-top:4px;">${formatUSD(val)}</div>
-                    <div style="font-size:0.72em;color:var(--text-dim);">${pct}% · ${count} tx</div>
+                    <div style="font-size:0.72em;color:var(--text-dim);">${pctLabel}${count} tx</div>
                 </div>`;
             });
             bdHtml += '</div>';
