@@ -301,9 +301,19 @@
                     if (dt) byDate.set(dt, d); // nouvelles données ont priorité
                 }
                 data = JSON.parse(JSON.stringify(data));
+                // Élaguer ce qui est STOCKÉ, pas seulement ce qui est synchronisé.
+                // Chaque jour pèse ~56 Ko (détail par NFT) et la fusion dédoublonne
+                // par date sans jamais rien jeter : sans cette coupe, la clé grossit
+                // de 56 Ko/jour jusqu'à saturer le quota de chrome.storage.local
+                // (10 Mo, l'extension ne demande pas unlimitedStorage) — après quoi
+                // les écritures échouent et la synchro s'arrête en silence.
+                const keepFrom = new Date(Date.now() - MAX_HISTORY_DAYS * 24 * 3600 * 1000)
+                    .toISOString().substring(0, 10);
                 data.data.array = Array.from(byDate.values())
+                    .filter(dd => (dd.createdAt || '').substring(0, 10) >= keepFrom)
                     .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-                log('Merge reward history: ' + existing.length + ' + ' + newDays.length + ' → ' + data.data.array.length + ' jours');
+                log('Merge reward history: ' + existing.length + ' + ' + newDays.length +
+                    ' → ' + data.data.array.length + ' jours (coupe à ' + MAX_HISTORY_DAYS + 'j)');
             }
 
             DATA.rewards[key] = {
@@ -323,7 +333,12 @@
         // explicitly REJECT any URL with /nft-game/ (Miner Wars namespace) or
         // /clan-leaderboard/ etc.
         const isMwUrl = /\/nft-game\/|\/clan-leaderboard\/|\/clan\/get-by(-id|-user)|\/round\/(get-state|get-last|find-by-cycleId)|\/rewards-by-user|\/get-total-reward-by-user|\/league\/(index|get-user-positions-data)|\/nft-game-bot|\/nft-game-token|\/nft-game-ability|\/nft-game-income|\/nft-game-user-profile|\/clan-rating|\/clan-message|\/league\/find-many|\/nft-game-round|wss?:\/\/(?:[a-z0-9-]+\.)*gomining\.com/i.test(url);
-        const isSoloMinerUrl = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)|\/nft-income|\/nft-collection|\/wallet\/find-by-user|\/ve-gomining-lock|\/home-page\/get-info/i.test(url);
+        // `/nft-income` est volontairement absent : extractEssentials ne lit
+        // l'historique que depuis DATA.rewards, et le payload pèse ~56 Ko par
+        // jour — le dupliquer ici coûtait 1,1 Mo que personne ne lisait.
+        // `/nft-collection` retiré aussi : 406 Ko jamais lus, et ses champs de
+        // puissance faussaient la détection de la ferme.
+        const isSoloMinerUrl = /\/nft\/(get-my|get-power-upgrade-info|get-upgrade-rate|my-computing-power-chart|get-info)|\/wallet\/find-by-user|\/ve-gomining-lock|\/home-page\/get-info/i.test(url);
         if (isSoloMinerUrl && !isMwUrl) {
             const key = extractEndpointKey(url);
             DATA.miners[key] = {
@@ -332,9 +347,14 @@
                 data: data
             };
             log('Données mineur (solo): ' + key);
-        } else if (!isMwUrl && (str.includes('th/s') || (str.includes('miner') && str.includes('nft')))) {
+        } else if (!isMwUrl && !/\/nft-income/i.test(url) &&
+                   (str.includes('th/s') || (str.includes('miner') && str.includes('nft')))) {
             // Loose fallback for solo data we haven't catalogued yet — but still
             // exclude MW URLs and require BOTH miner+nft keywords (not just 'power').
+            // `/nft-income` is excluded explicitly: its payload contains both
+            // "miner" and "nft", so it satisfied this fallback and got duplicated
+            // into DATA.miners at ~56 KB per day of history, for nothing —
+            // extractEssentials only ever reads it from DATA.rewards.
             const key = extractEndpointKey(url);
             DATA.miners[key] = {
                 url: url,
@@ -346,7 +366,13 @@
 
         // Prix — capturer spécifiquement les prix GoMining internes
         if (str.includes('price') || str.includes('rate') || str.includes('usd')) {
-            DATA.prices = { ...DATA.prices, source: url, raw: data };
+            // `raw` ne garde que les deux sources qui portent réellement un prix.
+            // Avant, n'importe quelle réponse contenant « usd » l'écrasait — on y
+            // trouvait le payload de wallet/find-by-user, recopié pour rien.
+            const isPriceSource = /getTokenPrice|home-page\/get-info/i.test(url);
+            DATA.prices = isPriceSource
+                ? { ...DATA.prices, source: url, raw: data }
+                : { ...DATA.prices };
 
             // Prix GMT interne GoMining (endpoint getTokenPrice)
             if (url.includes('getTokenPrice') && data?.data?.price) {
