@@ -3582,6 +3582,15 @@
             calcTotalDiscount();
             saveSettings();
             calculate();
+
+            // Le Portfolio ne se redessinait QUE lors du passage sur son onglet.
+            // Un utilisateur déjà dessus voyait donc un rendu antérieur à l'arrivée
+            // des données : le capital, la ventilation et la moyenne étaient bien
+            // en mémoire, l'écran ne les relisait jamais. C'est ce qui donnait
+            // « d'après tes saisies manuelles » alors que le relevé était là.
+            if (typeof updatePortfolio === 'function') {
+                try { updatePortfolio(); } catch (e) {}
+            }
         }
 
         // ===== VALIDATION =====

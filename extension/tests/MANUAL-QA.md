@@ -16,6 +16,7 @@ node extension/tests/reinvest-th.test.mjs
 node extension/tests/capital-persist.test.mjs
 node extension/tests/migration.test.mjs
 node extension/tests/daily-avg.test.mjs
+node extension/tests/portfolio-refresh.test.mjs
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -130,6 +131,7 @@ node extension/tests/reinvest-th.test.mjs
 node extension/tests/capital-persist.test.mjs
 node extension/tests/migration.test.mjs
 node extension/tests/daily-avg.test.mjs
+node extension/tests/portfolio-refresh.test.mjs
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le
