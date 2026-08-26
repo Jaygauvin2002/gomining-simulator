@@ -12,6 +12,8 @@ node extension/tests/bonus-miner.test.mjs
 node extension/tests/capital.test.mjs [chemin-vers-un-export.json]
 node extension/tests/reward-day.test.mjs [chemin-vers-un-export.json]
 node extension/tests/reward-formula.test.mjs
+node extension/tests/reinvest-th.test.mjs
+node extension/tests/capital-persist.test.mjs
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -57,6 +59,9 @@ Clique **Exporter JSON** dans le panneau, puis vérifie :
       parce que la clé ne garde que les deux derniers segments d'URL
 - [ ] la puissance affichée dans GMSim égale celle du widget « Mining farm »
       de GoMining, bonus inclus
+- [ ] **ferme l'onglet, rouvre gmsim.ca sans repasser sur GoMining** : le capital
+      et le coût par TH doivent toujours être là. Le relevé brut est purgé au bout
+      de 24 h par l'extension, c'est le résultat du calcul qui est conservé.
 - [ ] le Portfolio indique « Depuis tes dépôts GoMining » sous le capital, et
       non le message de repli — sinon le relevé n'a pas été capté assez loin
       (il faut aussi les `asset-conversion`, pas seulement les dépôts, pour
@@ -106,6 +111,8 @@ node extension/tests/bonus-miner.test.mjs
 node extension/tests/capital.test.mjs [chemin-vers-un-export.json]
 node extension/tests/reward-day.test.mjs [chemin-vers-un-export.json]
 node extension/tests/reward-formula.test.mjs
+node extension/tests/reinvest-th.test.mjs
+node extension/tests/capital-persist.test.mjs
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le

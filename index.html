@@ -3442,7 +3442,10 @@
             // Capital externe, reconstitué depuis le relevé de transactions.
             // Reste null si le relevé n'a pas été capté — le Portfolio doit
             // pouvoir distinguer « aucun dépôt » de « je n'en sais rien ».
-            if (data.capital) state.capital = data.capital;
+            if (data.capital) {
+                state.capital = mergeCapital(state.capital, data.capital);
+                saveCapital(state.capital);
+            }
 
             // Termes complémentaires de la formule GoMining, mesurés sur le dernier
             // jour complet : bonus GoBTC Pay et commission de réinvestissement.
@@ -4351,6 +4354,44 @@ function renderCalendar(history, chartEl) {
                 localStorage.setItem(RH_KEY, JSON.stringify(history));
                 localStorage.setItem(RH_KEY + '_ver', RH_VERSION);
             } catch(e) { /* quota exceeded — ignore */ }
+        }
+
+        // ===== CAPITAL EXTERNE, PERSISTÉ =====
+        // Le relevé de transactions brut est purgé par l'extension au bout de 24 h,
+        // conformément à ce qu'annonce notre politique de confidentialité. On garde
+        // donc ici le RÉSULTAT du calcul, pas les transactions : quelques nombres,
+        // qui suffisent au Portfolio et évitent de refaire défiler des dizaines de
+        // pages d'historique chaque jour.
+        const CAPITAL_KEY = 'gms_capital';
+        const CAPITAL_VERSION = 'v1';
+
+        function loadCapital() {
+            try {
+                if (localStorage.getItem(CAPITAL_KEY + '_ver') !== CAPITAL_VERSION) {
+                    localStorage.removeItem(CAPITAL_KEY);
+                    return null;
+                }
+                return JSON.parse(localStorage.getItem(CAPITAL_KEY)) || null;
+            } catch (e) { return null; }
+        }
+
+        function saveCapital(cap) {
+            try {
+                localStorage.setItem(CAPITAL_KEY, JSON.stringify(cap));
+                localStorage.setItem(CAPITAL_KEY + '_ver', CAPITAL_VERSION);
+            } catch (e) {}
+        }
+
+        // Une visite qui ne touche pas la page des transactions ne voit que
+        // quelques lignes : elle ne doit PAS écraser un calcul fondé sur tout
+        // l'historique. On ne remplace donc que si la nouvelle mesure s'appuie sur
+        // au moins autant de transactions.
+        function mergeCapital(stored, incoming) {
+            if (!incoming) return stored;
+            if (!stored) return incoming;
+            const a = incoming.txCount || 0;
+            const b = stored.txCount || 0;
+            return a >= b ? incoming : stored;
         }
 
         function loadRewardHistory() {
@@ -6101,6 +6142,7 @@ function renderCalendar(history, chartEl) {
 
         // Load persisted reward history before first sync
         state.rewardHistory = loadRewardHistory();
+        state.capital = loadCapital();   // survit à la purge 24 h de l'extension
         if (state.rewardHistory.length > 0) {
             document.getElementById('dash-history-section').style.display = 'block';
             showDashboardCalendar(state.rewardHistory);
