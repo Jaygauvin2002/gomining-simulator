@@ -463,13 +463,30 @@
         // --- entrées externes ---
         const deposits = {};
         let externalWithdrawals = 0;
+        const withdrawUnvalued = {};
+        // Types rencontrés mais non catégorisés. On les remonte au lieu de les
+        // ignorer en silence : un utilisateur qui a fait un mouvement qu'on ne
+        // connaît pas verrait sinon sa ventilation incomplète sans jamais savoir
+        // pourquoi. Jérémie n'a fait ni retrait, ni transfert, ni vente de mineur,
+        // donc leurs `fromType` restent inconnus — les deviner serait refaire
+        // l'erreur qu'on a déjà payée deux fois.
+        const unknownTypes = {};
         const spentGmt = {};
         for (const t of txs) {
             const c = cur(t);
             if (t.type === 'deposit' && EXTERNAL_IN.test(t.fromType || '')) {
                 deposits[c] = (deposits[c] || 0) + amt(t);
             }
-            if (t.type === 'withdraw' && t.hasWithdrawOrder) externalWithdrawals += amt(t);
+            // Sortie externe : détectée par l'ORDRE de retrait, pas par le nom du
+            // fromType — ce marqueur est fiable quel que soit le libellé, y compris
+            // pour un type qu'on n'a jamais rencontré. Converti en GMT comme le
+            // reste : additionner du SOL et du BTC bruts ne veut rien dire.
+            if (t.type === 'withdraw' && t.hasWithdrawOrder) {
+                const w = amt(t);
+                if (c === 'GMT') externalWithdrawals += w;
+                else if (rates[c]) externalWithdrawals += w * rates[c];
+                else withdrawUnvalued[c] = (withdrawUnvalued[c] || 0) + w;
+            }
             if (t.type === 'withdraw' && TH_SPEND.test(t.fromType || '') && c === 'GMT') {
                 spentGmt[t.fromType] = (spentGmt[t.fromType] || 0) + amt(t);
             }
@@ -494,9 +511,17 @@
         // et les paiements internes n'ont rien à faire dans un journal
         // d'investissement, et moins on en recopie, mieux c'est.
         const items = [];
+        const KNOWN_INTERNAL = /^(asset-conversion|nft-reinvestment|simple-earn-reward|internal-payment)$/i;
         for (const t of txs) {
-            const cat = SPEND_CATEGORY[String(t.fromType || '').toLowerCase()];
-            if (!cat) continue;
+            const ft = String(t.fromType || '').toLowerCase();
+            const cat = SPEND_CATEGORY[ft];
+            if (!cat) {
+                if (ft && !KNOWN_INTERNAL.test(ft)) {
+                    const u = unknownTypes[ft] || (unknownTypes[ft] = { count: 0, type: t.type });
+                    u.count++;
+                }
+                continue;
+            }
             const c = cur(t), v = amt(t);
             if (v <= 0) continue;
             const entry = byCategory[cat] || (byCategory[cat] = { gmt: 0, txCount: 0 });
@@ -528,6 +553,8 @@
             unvalued: unvalued,
             gmtEquivalent: gmtEquivalent > 0 ? gmtEquivalent : null,
             externalWithdrawals: externalWithdrawals,
+            withdrawUnvalued: withdrawUnvalued,
+            unknownTypes: unknownTypes,
             spentOnThGmt: Object.values(spentGmt).reduce((a, b) => a + b, 0),
             spentBreakdownGmt: spentGmt,
         };

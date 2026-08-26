@@ -5108,6 +5108,7 @@ function renderCalendar(history, chartEl) {
                 port_bd_ledger: 'Filled in from your GoMining transactions — nothing to enter by hand. Percentages are shares of what you spent; deposits are the capital it came from. Manual entries stay in the table below and are not counted twice.',
                 port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
                 port_bd_no_cats: 'captured before categorisation existed — reload the extension',
+                port_bd_unknown: 'uncategorised movement types seen: {types} — tell us and we will map them',
                 tx_auto: 'auto', tx_count_label: 'transactions',
                 tx_from_gomining: 'from GoMining', tx_manual: 'entered by hand',
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
@@ -5376,6 +5377,7 @@ function renderCalendar(history, chartEl) {
                 port_bd_ledger: 'Rempli depuis tes transactions GoMining — rien à saisir. Les pourcentages sont des parts de ce que tu as dépensé ; les dépôts sont le capital d\'où ça vient. Tes lignes manuelles restent dans la table et ne sont pas comptées deux fois.',
                 port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
                 port_bd_no_cats: 'capturé avant la catégorisation — recharge l\'extension',
+                port_bd_unknown: 'types de mouvement non catégorisés : {types} — signale-le et on les mappera',
                 tx_auto: 'auto', tx_count_label: 'transactions',
                 tx_from_gomining: 'depuis GoMining', tx_manual: 'saisies à la main',
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
@@ -5893,6 +5895,7 @@ function renderCalendar(history, chartEl) {
             // l'autre. Et surtout on n'additionne PAS les revenus cumulés à la
             // valeur de l'actif : les gains réinvestis sont déjà DANS l'actif sous
             // forme de TH, les compter deux fois était l'erreur inverse.
+            const gmtP = state.gmtPrice || 0;
             const thNow = parseFloat(document.getElementById('hashrate')?.value) || 0;
             const thCost = parseFloat(document.getElementById('cost-per-th-upgrade')?.value) || 12.34;
             const lockedGmt = parseFloat(document.getElementById('gmt-locked')?.value) || 0;
@@ -5902,7 +5905,7 @@ function renderCalendar(history, chartEl) {
             // le produit dort encore en solde.
             const liquidGmt = parseFloat(document.getElementById('gmt-prepaid')?.value) || 0;
             const liquidBtc = state.btcWalletBalance || 0;
-            const gp = state.gmtPrice || 0;
+            const gp = gmtP;
             // Valeur de REMPLACEMENT, pas cote de marché : les TH sont valorisés
             // au taux d'upgrade in-app, c'est-à-dire au prix du neuf. C'est un
             // plafond — la revente sur le marché secondaire se fait sous ce prix,
@@ -5910,7 +5913,13 @@ function renderCalendar(history, chartEl) {
             const assetValue = thNow * thCost
                              + (lockedGmt + liquidGmt) * gp
                              + liquidBtc * (state.btcPrice || 0);
-            const withdrawn = 0; // aucune sortie externe détectée dans le relevé
+            // Sorties externes, détectées par l'ORDRE de retrait — un marqueur fiable
+            // quel que soit le libellé du type, y compris pour un type qu'on n'a
+            // jamais rencontré. Restait codé à zéro faute de savoir le lire : tout
+            // utilisateur ayant retiré voyait donc son profit sous-estimé d'autant.
+            const withdrawn = (state.capital?.externalWithdrawals > 0 && gmtP)
+                ? state.capital.externalWithdrawals * gmtP
+                : 0;
 
             const pnl = assetValue + withdrawn - capital;
             // Convention demandée : 100 % = investissement intégralement récupéré.
@@ -6058,7 +6067,6 @@ function renderCalendar(history, chartEl) {
             // la main si aucun relevé n'a été capté.
             const ledgerCats = state.capital?.byCategory;
             const bdFromLedger = !!ledgerCats && Object.keys(ledgerCats).length > 0;
-            const gmtP = state.gmtPrice || 0;
 
             // Le dépôt est de l'argent qui ENTRE, les autres catégories de l'argent
             // qui SORT. Les additionner pour en faire un dénominateur commun n'a
@@ -6101,8 +6109,13 @@ function renderCalendar(history, chartEl) {
             // Sans ça, « d'après tes saisies » ne distingue pas « aucun relevé
             // capté » de « relevé capté mais trop ancien pour être ventilé », et
             // on cherche à l'aveugle.
+            const unknown = state.capital?.unknownTypes || {};
+            const unknownList = Object.keys(unknown);
             const capDiag = state.capital
                 ? ` (${state.capital.txCount || 0} tx${bdFromLedger ? '' : ', ' + t('port_bd_no_cats')})`
+                  + (unknownList.length > 0
+                      ? ` · ${t('port_bd_unknown').replace('{types}', unknownList.join(', '))}`
+                      : '')
                 : '';
             bdHtml += `<p style="margin:12px 0 0;font-size:0.74em;color:var(--text-dim);">${
                 (bdFromLedger ? t('port_bd_ledger') : t('port_bd_manual')) + capDiag}</p>`;

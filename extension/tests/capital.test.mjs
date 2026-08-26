@@ -148,6 +148,37 @@ if (real && existsSync(real)) {
   }
 }
 
+// 8bis. Un type inconnu doit être REMONTÉ, jamais ignoré en silence.
+//
+//       Jérémie n'a jamais fait de retrait, de transfert, de vente de mineur,
+//       d'upgrade d'efficacité ni d'achat échelonné — ces types existent chez
+//       GoMining mais leurs `fromType` restent donc inconnus. Les deviner serait
+//       refaire l'erreur déjà payée deux fois. En attendant, un utilisateur qui
+//       en fait un doit le voir signalé plutôt que de subir une ventilation
+//       incomplète sans explication.
+{
+  const r = make(wrap([
+    tx({ id: 1, at: '2026-01-01T10:00:00Z', type: 'withdraw', from: 'un-type-jamais-vu', amt: 5, cur: 'GMT' }),
+    tx({ id: 2, at: '2026-01-02T10:00:00Z', type: 'deposit',  from: 'asset-conversion',  amt: 9, cur: 'GMT' }),
+  ]))();
+  check(r.unknownTypes && r.unknownTypes['un-type-jamais-vu']?.count === 1,
+        `type inconnu remonté (obtenu ${JSON.stringify(r.unknownTypes)})`);
+  check(!r.unknownTypes['asset-conversion'],
+        'un interne connu ne doit PAS être signalé comme inconnu');
+}
+
+// 8ter. Sortie externe : reconnue par l'ordre de retrait, pas par le nom du type,
+//       et convertie en GMT — additionner du SOL et du BTC bruts ne veut rien dire.
+{
+  const r = make(wrap([
+    tx({ id: 1, at: '2026-04-01T12:00:05Z', type: 'withdraw', from: 'asset-conversion', amt: 10,  cur: 'SOL' }),
+    tx({ id: 2, at: '2026-04-01T12:00:07Z', type: 'deposit',  from: 'asset-conversion', amt: 2800, cur: 'GMT' }),
+    tx({ id: 3, at: '2026-06-01T10:00:00Z', type: 'withdraw', from: 'type-inconnu-de-retrait', amt: 2, cur: 'SOL', extOut: 1 }),
+  ]))();
+  check(Math.abs(r.externalWithdrawals - 560) < 0.01,
+        `2 SOL × 280 = 560 GMT de sortie, malgré un type inconnu (obtenu ${r.externalWithdrawals})`);
+}
+
 // 9. Ventilation par catégorie : c'est ce qui remplit le Breakdown sans saisie.
 {
   const r = make(wrap([
