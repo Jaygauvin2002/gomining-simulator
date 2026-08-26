@@ -1549,6 +1549,7 @@
                 <div class="port-kpi">
                     <div class="port-kpi-label" data-i18n="port_daily_avg">Avg Gain / Day</div>
                     <div class="port-kpi-value" id="port-daily-avg" style="color:var(--green);">--</div>
+                    <div class="port-kpi-sub" id="port-daily-avg-sub"></div>
                 </div>
                 <div class="port-kpi">
                     <div class="port-kpi-label" data-i18n="port_cost_per_th">Cost / TH</div>
@@ -5078,6 +5079,10 @@ function renderCalendar(history, chartEl) {
                 port_cum_lifetime_mw: 'Lifetime, GoMining\'s totals — includes {mw} from Miner Wars',
                 port_cum_measured: 'Over the days this site was open',
                 port_cum_estimate: 'Estimated from the current daily rate',
+                port_avg_window: 'Over the last {n} measured day(s)',
+                port_avg_calc: 'No measured day yet — calculated rate',
+                port_bd_ledger: 'Filled in from your GoMining transactions — nothing to enter by hand. Manual entries stay in the table below and are not counted twice.',
+                port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
                 port_need_deposit: 'Add a Deposit entry — only money from outside counts as capital.',
                 port_capital_fallback: 'Estimated from purchases. Log your deposits for an exact figure.',
@@ -5338,6 +5343,10 @@ function renderCalendar(history, chartEl) {
                 port_cum_lifetime_mw: 'Depuis le début, totaux GoMining — dont {mw} de Miner Wars',
                 port_cum_measured: 'Sur les jours où ce site a été ouvert',
                 port_cum_estimate: 'Estimé d\'après le rythme quotidien actuel',
+                port_avg_window: 'Sur les {n} dernier(s) jour(s) mesuré(s)',
+                port_avg_calc: 'Aucun jour mesuré — rythme calculé',
+                port_bd_ledger: 'Rempli depuis tes transactions GoMining — rien à saisir. Tes lignes manuelles restent dans la table ci-dessous et ne sont pas comptées deux fois.',
+                port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
                 port_need_deposit: 'Ajoute une ligne Dépôt — seul l\'argent venu de l\'extérieur compte comme capital.',
                 port_capital_fallback: 'Estimé d\'après tes achats. Saisis tes dépôts pour un chiffre exact.',
@@ -5878,14 +5887,32 @@ function renderCalendar(history, chartEl) {
             // c'est du profit. Plus lisible qu'un ROI centré sur zéro pour une
             // position que l'on détient toujours.
             const recovery = capital > 0 ? ((assetValue + withdrawn) / capital * 100) : null;
-            // La moyenne doit porter sur la même période que le cumul. Diviser un
-            // cumul à vie par l'ancienneté est juste ; diviser trois jours de
-            // journal par 370 jours d'ancienneté donnait $0,07, un chiffre qui ne
-            // décrit rien.
-            const avgDays = (cumSource === 'lifetime' || cumSource === 'estimate')
-                ? days
-                : Math.max(1, loadPerformance().length);
-            const dailyAvg = cumUsd / avgDays;
+            // Moyenne quotidienne : sur les 7 DERNIERS jours mesurés, pas depuis le
+            // début.
+            //
+            // Une moyenne à vie décrit un passé qu'on a quitté. Jérémie est resté à
+            // 16 TH près de la moitié de son ancienneté : diviser son cumul par 370
+            // jours donne un chiffre qui ne dit rien de ce que sa ferme rapporte
+            // aujourd'hui — et c'est précisément la question que pose ce KPI.
+            //
+            // On prend donc les jours complets les plus récents de l'historique
+            // réel, au plus 7, et on annonce combien on en a trouvé : après cinq
+            // semaines en Miner Wars, il n'y a qu'un seul jour solo récent, et le
+            // dire vaut mieux que de faire passer un jour pour une semaine.
+            const AVG_WINDOW_DAYS = 7;
+            const recentDays = (state.rewardHistory || [])
+                .filter(d => d && d.date && !d.partial && d.valueBtc > 0)
+                .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+                .slice(0, AVG_WINDOW_DAYS);
+            let dailyAvg = 0;
+            let avgCount = recentDays.length;
+            if (avgCount > 0) {
+                const sum = recentDays.reduce((acc, d) =>
+                    acc + d.valueBtc * (d.btcPrice || state.btcPrice || 0), 0);
+                dailyAvg = sum / avgCount;
+            } else if (currentDailyUsd > 0) {
+                dailyAvg = currentDailyUsd;   // aucun jour mesuré : le rythme calculé
+            }
 
             // KPIs
             document.getElementById('port-total-invested').textContent =
@@ -5941,6 +5968,13 @@ function renderCalendar(history, chartEl) {
 
             document.getElementById('port-days').textContent = days + 'j';
             document.getElementById('port-daily-avg').textContent = formatUSD(dailyAvg);
+            const avgSub = document.getElementById('port-daily-avg-sub');
+            if (avgSub) {
+                avgSub.textContent = avgCount > 0
+                    ? t('port_avg_window').replace('{n}', avgCount)
+                    : t('port_avg_calc');
+                avgSub.style.display = '';
+            }
 
             // Note: totalDailyUsd calculated below after staking calc
 
@@ -5972,13 +6006,30 @@ function renderCalendar(history, chartEl) {
             document.getElementById('port-asset-value').textContent = formatUSD(assetValue);
 
             // Breakdown par catégorie
+            //
+            // Le relevé de transactions fait foi quand il est là : il connaît le
+            // type de chaque mouvement (`fromType`), donc la ventilation se remplit
+            // sans une seule saisie. Les lignes saisies à la main ne sont PAS
+            // additionnées par-dessus — ce serait compter deux fois les mêmes achats.
+            // Elles restent visibles dans la table des transactions, et reprennent
+            // la main si aucun relevé n'a été capté.
+            const ledgerCats = state.capital?.byCategory;
+            const bdFromLedger = !!ledgerCats && Object.keys(ledgerCats).length > 0;
+            const gmtP = state.gmtPrice || 0;
+            const bdTotal = bdFromLedger
+                ? Object.values(ledgerCats).reduce((a, c) => a + (c.gmt || 0), 0) * gmtP
+                : invested;
+
             const bdCatMeta = getCatMeta();
             let bdHtml = '<div class="live-data" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">';
             Object.keys(bdCatMeta).forEach(cat => {
                 const meta = bdCatMeta[cat];
-                const val = totals[cat] || 0;
-                const pct = invested > 0 ? (val / invested * 100).toFixed(0) : 0;
-                const count = txs.filter(t => t.category === cat).length;
+                const led = bdFromLedger ? ledgerCats[cat] : null;
+                const val = bdFromLedger ? (led ? led.gmt * gmtP : 0) : (totals[cat] || 0);
+                const pct = bdTotal > 0 ? (val / bdTotal * 100).toFixed(0) : 0;
+                const count = bdFromLedger
+                    ? (led ? led.txCount : 0)
+                    : txs.filter(t => t.category === cat).length;
                 bdHtml += `<div class="live-card" style="text-align:center;">
                     <div style="font-size:1.5em;margin-bottom:4px;">${meta.icon}</div>
                     <div class="label">${meta.label}</div>
@@ -5987,6 +6038,10 @@ function renderCalendar(history, chartEl) {
                 </div>`;
             });
             bdHtml += '</div>';
+            // Dire d'où vient la ventilation : « depuis tes transactions GoMining »
+            // et « depuis tes saisies » ne s'interprètent pas pareil.
+            bdHtml += `<p style="margin:12px 0 0;font-size:0.74em;color:var(--text-dim);">${
+                bdFromLedger ? t('port_bd_ledger') : t('port_bd_manual')}</p>`;
             document.getElementById('port-breakdown').innerHTML = bdHtml;
 
             // Projection (mining + staking)

@@ -30,8 +30,17 @@ const pick = (n) => {
   return `const ${n} = /${m[1]}/${m[2]};`;
 };
 
+// SPEND_CATEGORY est un objet, pas une regex : on l'extrait par accolades.
+const spendCategorySrc = (() => {
+  const i = SRC.indexOf('const SPEND_CATEGORY');
+  if (i < 0) throw new Error('SPEND_CATEGORY introuvable');
+  const end = SRC.indexOf('};', i);
+  return SRC.slice(i, end + 2);
+})();
+
 const make = (DATA) => new Function('DATA',
-  pick('EXTERNAL_IN') + pick('TH_SPEND') + grab('computeCapital') + '; return computeCapital;')(DATA);
+  pick('EXTERNAL_IN') + pick('TH_SPEND') + spendCategorySrc + grab('computeCapital') +
+  '; return computeCapital;')(DATA);
 
 let pass = 0; const fails = [];
 const check = (c, l) => c ? pass++ : fails.push(l);
@@ -137,6 +146,37 @@ if (real && existsSync(real)) {
     check(r.externalWithdrawals === 0, 'relevé réel → aucune sortie externe (attendu pour ce compte)');
     check(r.spentOnThGmt > 15000, `relevé réel → dépense TH > 15000 GMT (obtenu ${r.spentOnThGmt.toFixed(0)})`);
   }
+}
+
+// 9. Ventilation par catégorie : c'est ce qui remplit le Breakdown sans saisie.
+{
+  const r = make(wrap([
+    tx({ id: 1, at: '2026-01-01T10:00:00Z', type: 'deposit',  from: 'fireblocks-deposit',   amt: 100, cur: 'GMT', extIn: 1 }),
+    tx({ id: 2, at: '2026-02-01T10:00:00Z', type: 'withdraw', from: 'marketplace-withdraw', amt: 500, cur: 'GMT' }),
+    tx({ id: 3, at: '2026-03-01T10:00:00Z', type: 'withdraw', from: 'nft-upgrade-power',    amt: 300, cur: 'GMT' }),
+    tx({ id: 4, at: '2026-04-01T10:00:00Z', type: 'withdraw', from: 've-gomining-lock',     amt: 50,  cur: 'GMT' }),
+    // Ceux-ci ne doivent atterrir dans AUCUNE catégorie : ce sont des échanges de
+    // devise et des revenus, pas des emplois d'argent.
+    tx({ id: 5, at: '2026-05-01T10:00:00Z', type: 'deposit',  from: 'asset-conversion',     amt: 9000, cur: 'GMT' }),
+    tx({ id: 6, at: '2026-05-02T10:00:00Z', type: 'deposit',  from: 'nft-reinvestment',     amt: 7,   cur: 'GMT' }),
+    tx({ id: 7, at: '2026-05-03T10:00:00Z', type: 'withdraw', from: 'internal-payment',     amt: 3,   cur: 'GMT' }),
+  ]))();
+  const c = r.byCategory || {};
+  check(c.deposit?.gmt === 100, `catégorie deposit (obtenu ${c.deposit?.gmt})`);
+  check(c.nft?.gmt === 500,     `catégorie nft (obtenu ${c.nft?.gmt})`);
+  check(c.upgrade?.gmt === 300, `catégorie upgrade (obtenu ${c.upgrade?.gmt})`);
+  check(c.lock?.gmt === 50,     `catégorie lock (obtenu ${c.lock?.gmt})`);
+  check(c.nft?.txCount === 1,   `nombre de tx par catégorie (obtenu ${c.nft?.txCount})`);
+  const totalCat = Object.values(c).reduce((a, x) => a + x.gmt, 0);
+  check(totalCat === 950,
+        `les mouvements internes restent hors ventilation : 950 attendu, obtenu ${totalCat}`);
+}
+
+// 10. Une devise sans taux ne doit pas être valorisée au hasard dans la ventilation.
+{
+  const r = make(wrap([tx({ id: 1, at: '2026-01-01T10:00:00Z', type: 'withdraw', from: 'nft-upgrade-power', amt: 4, cur: 'DOGE' })]))();
+  check(!(r.byCategory.upgrade?.gmt > 0), 'devise sans taux → pas valorisée dans la catégorie');
+  check(r.categoryUnvalued?.DOGE === 4, `montant non valorisé déclaré (obtenu ${r.categoryUnvalued?.DOGE})`);
 }
 
 const total = pass + fails.length;

@@ -402,6 +402,24 @@
     const EXTERNAL_IN = /^(fireblocks-deposit|payment)$/i;
     const TH_SPEND    = /^(marketplace-withdraw|nft-upgrade-power)$/i;
 
+    // Correspondance fromType → catégorie du Portfolio, pour remplir la
+    // ventilation sans saisie manuelle. Relevée sur un relevé réel : ce sont les
+    // seuls fromType qui représentent un emploi ou une entrée d'argent.
+    //
+    // Tout ce qui n'est PAS ici est délibérément non catégorisé : `asset-conversion`
+    // (échange de devise), `nft-reinvestment` et `simple-earn-reward` (des revenus,
+    // pas des dépenses), `internal-payment`. Les ranger quelque part gonflerait la
+    // ventilation avec des mouvements qui ne sont ni du capital ni de la dépense.
+    const SPEND_CATEGORY = {
+        'fireblocks-deposit': 'deposit',
+        'payment': 'deposit',
+        'marketplace-withdraw': 'nft',
+        'nft-upgrade-power': 'upgrade',
+        'nft-upgrade-efficiency': 'upgrade-wth',
+        've-gomining-lock': 'lock',
+        'simple-earn-stake': 'staking',
+    };
+
     function computeCapital() {
         let entry = null;
         for (const pool of [DATA.rewards, DATA.miners]) {
@@ -465,9 +483,28 @@
             else unvalued[c] = v;   // jamais converti par l'utilisateur → pas de taux honnête
         }
 
+        // Ventilation par catégorie, convertie en GMT avec les taux mesurés plus
+        // haut. Une devise sans taux est comptabilisée à part plutôt que valorisée
+        // au hasard — même règle que pour le capital.
+        const byCategory = {};
+        const catUnvalued = {};
+        for (const t of txs) {
+            const cat = SPEND_CATEGORY[String(t.fromType || '').toLowerCase()];
+            if (!cat) continue;
+            const c = cur(t), v = amt(t);
+            if (v <= 0) continue;
+            const entry = byCategory[cat] || (byCategory[cat] = { gmt: 0, txCount: 0 });
+            entry.txCount++;
+            if (c === 'GMT') entry.gmt += v;
+            else if (rates[c]) entry.gmt += v * rates[c];
+            else catUnvalued[c] = (catUnvalued[c] || 0) + v;
+        }
+
         return {
             source: 'transaction-history',
             txCount: txs.length,
+            byCategory: byCategory,
+            categoryUnvalued: catUnvalued,
             deposits: deposits,
             rates: rates,
             unvalued: unvalued,
