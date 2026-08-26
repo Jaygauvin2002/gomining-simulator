@@ -2661,7 +2661,11 @@
                     const dynDiscount = getDynamicDiscount(th, gmtPrepaid, c.efficiency, c.elecCost);
                     const dayR = calcDailyReward(th, c.efficiency, c.elecCost, dynDiscount, currentBtcPrice, c.satPerTH);
                     if (!dayR) break;
-                    const thGain = (dayR.grossUsd / costPerTH) * (1 + bonusPct);
+                    // Le réinvestissement porte sur le NET, jamais sur le brut : les frais sont
+                    // déduits avant que quoi que ce soit ne soit reçu. Vérifié empiriquement
+                    // sur 19 jours consécutifs de croissance réelle — prédire depuis le net
+                    // colle à ~2 %, depuis le brut c'est 5 à 8× trop.
+                    const thGain = (dayR.netUsd / costPerTH) * (1 + bonusPct);
                     totalTH += thGain;
                     totalFees += dayR.feesUsd;
                     th += thGain;
@@ -2925,7 +2929,8 @@
                     parseFloat(document.getElementById('discount').value) || 0, bp,
                     parseFloat(document.getElementById('sat-per-th').value) || 45);
                 if (!dayR) break;
-                const thGain = (dayR.grossUsd / costPerTH) * 1.05;
+                // Net, pas brut — cf. la note dans la boucle du Strategy Lab.
+                const thGain = (dayR.netUsd / costPerTH) * 1.05;
                 th += thGain;
             }
             const thReward = calcDailyReward(th, efficiency, 0.05,
@@ -3065,7 +3070,8 @@
             while (th < targetTH && days < maxDays) {
                 const dayR = calcDailyReward(th, c.efficiency, c.elecCost, c.discount, state.btcPrice, c.satPerTH);
                 if (!dayR || dayR.grossUsd <= 0) return null;
-                const thGain = (dayR.grossUsd / costPerTH) * (1 + bonusPct);
+                // Net, pas brut — cf. la note dans la boucle du Strategy Lab.
+                const thGain = (dayR.netUsd / costPerTH) * (1 + bonusPct);
                 th += thGain;
                 days++;
             }
@@ -4066,7 +4072,8 @@ function renderCalendar(history, chartEl) {
             while (th < targetTH && days < maxDays) {
                 const dayR = calcDailyReward(th, c.efficiency, c.elecCost, c.discount, state.btcPrice, c.satPerTH);
                 if (!dayR || dayR.grossUsd <= 0) return null;
-                th += (dayR.grossUsd / costPerTH) * (1 + bonusPct);
+                // Net, pas brut — cf. la note dans la boucle du Strategy Lab.
+            th += (dayR.netUsd / costPerTH) * (1 + bonusPct);
                 days++;
                 if (days % Math.max(1, Math.floor(days / 50)) === 0 || th >= targetTH) {
                     curve.push({ day: days, th });
@@ -4196,7 +4203,8 @@ function renderCalendar(history, chartEl) {
                     if (!r) { points.push({ m, val: cumProfit }); continue; }
                     const monthProfit = r.netUsd * 30;
                     if (doReinvest && m > 0) {
-                        th += (r.grossUsd * 30 / costPerTH) * 1.05;
+                        // Net, pas brut — cf. la note dans la boucle du Strategy Lab.
+                        th += (r.netUsd * 30 / costPerTH) * 1.05;
                     }
                     cumProfit += monthProfit;
                     points.push({ m, val: cumProfit, th });

@@ -413,7 +413,10 @@ function runStrategySimulation() {
             dayGmt = dayR.grossGmt;
         } else if (strat === 'th') {
             // gross USD value of the day's reward, +5% bonus, divided by cost per TH
-            dayTh = (dayR.grossUsd * (1 + STRATEGY_TH_BONUS)) / costPerTH;
+            // Le réinvestissement porte sur le NET, jamais sur le brut : les frais
+            // sont déduits avant réception. Vérifié sur 19 jours de croissance
+            // réelle — depuis le net l'écart est de ~2 %, depuis le brut 5 à 8×.
+            dayTh = (dayR.netUsd * (1 + STRATEGY_TH_BONUS)) / costPerTH;
             power += dayTh; // compound for next day
         }
 
