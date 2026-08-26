@@ -1196,7 +1196,25 @@
         for (const r of Object.values(DATA.rewards)) {
             if (r.url?.includes('/nft-income/find-aggregated-by-date') && r.data?.data?.array) {
                 for (const day of r.data.data.array) {
-                    const dateStr = day.createdAt?.substring(0, 10);
+                    // GoMining écrit l'enregistrement le LENDEMAIN du jour miné :
+                    // `createdAt` est la date d'écriture, `calculatedAt` (à
+                    // 23:59:59.999) est le jour réellement miné. Vérifié sur 20
+                    // jours consécutifs : l'écart est systématiquement de J-1.
+                    //
+                    // Se fier à createdAt avait deux effets, tous deux constatés :
+                    // le calendrier décalait chaque gain d'un jour, et le jour
+                    // daté d'aujourd'hui — qui est en fait la journée COMPLÈTE de
+                    // la veille — était marqué « partiel » puis écarté. Le site
+                    // remontait alors au dernier jour « complet » vieux de 36
+                    // jours et retombait sur son PR par défaut de 47 sat/TH au
+                    // lieu des 50 réels, sous-estimant le gain net de 38 %.
+                    const calcDay = day.incomeStatistic?.calculatedAt?.substring(0, 10);
+                    let dateStr = calcDay;
+                    if (!dateStr && day.createdAt) {
+                        // Repli : reculer d'un jour, puisque le décalage est la règle.
+                        const t = Date.parse(day.createdAt.substring(0, 10) + 'T00:00:00Z');
+                        if (isFinite(t)) dateStr = new Date(t - 86400000).toISOString().substring(0, 10);
+                    }
                     if (!dateStr || dateStr < cutoffDate) continue; // Skip old data
 
                     // Aggregate ALL miner NFTs for this day (exclude nft 21521713 which is staking-related).
@@ -1215,9 +1233,10 @@
                     // For totalDiscount, take the value from the largest NFT (they should all have the same discount)
                     const main = incomes.reduce((a, b) => (b.power || 0) > (a.power || 0) ? b : a, incomes[0]);
 
-                    // Mark today's entry as `partial: true` — it's accumulating since
-                    // 00:00 UTC and any consumer that uses `poolReward / power` for the
-                    // PR display will get inflated values without this flag.
+                    // `partial` se juge sur le jour MINÉ, pas sur la date d'écriture.
+                    // Un jour dont les récompenses sont encore en cours d'accumulation
+                    // donnerait un poolReward/power sous-évalué à tout consommateur
+                    // qui l'utilise pour le PR.
                     const todayUTC = new Date().toISOString().substring(0, 10);
                     result.rewardHistory.push({
                         date: dateStr,

@@ -10,6 +10,7 @@ node extension/tests/routing.test.mjs
 node extension/tests/merge.test.mjs
 node extension/tests/bonus-miner.test.mjs
 node extension/tests/capital.test.mjs [chemin-vers-un-export.json]
+node extension/tests/reward-day.test.mjs [chemin-vers-un-export.json]
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -80,6 +81,13 @@ Sur `gmsim.ca` (ou en local) :
 - [ ] la puissance de ferme correspond à ce que GoMining affiche
 - [ ] le calendrier des récompenses est rempli et à jour
 - [ ] la pastille de fraîcheur est verte, pas ambre
+- [ ] le dernier jour du calendrier est **hier**, pas aujourd'hui — GoMining
+      écrit l'enregistrement le lendemain du jour miné, et c'est `calculatedAt`
+      qui donne le vrai jour
+- [ ] le PR affiché correspond au poolReward réel du dernier jour complet, pas
+      à la valeur par défaut de 47 sat/TH
+- [ ] le gain net quotidien correspond au `gmtIncomeBasedOnBtcIncome` du dernier
+      jour dans GoMining (à quelques pourcents près)
 - [ ] Pool Reward / sat-per-TH cohérents
 - [ ] pas d'erreur dans la console
 
@@ -93,6 +101,7 @@ node extension/tests/routing.test.mjs
 node extension/tests/merge.test.mjs
 node extension/tests/bonus-miner.test.mjs
 node extension/tests/capital.test.mjs [chemin-vers-un-export.json]
+node extension/tests/reward-day.test.mjs [chemin-vers-un-export.json]
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le
