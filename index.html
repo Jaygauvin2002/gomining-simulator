@@ -1999,13 +1999,34 @@
         // C1 (électricité) = kWh * 24 * W/TH / GMT_price / 1000 * (1 - discount)
         // C2 (service)     = 0.0089 / GMT_price * (1 - discount)
         // Reward/TH        = PR_gmt - C1 - C2
-        function calcDailyReward(hashrateTH, efficiencyWTH, elecCostKwh, discountPct, btcPrice, satPerTH) {
+        // gbpSat / commissionRate sont facultatifs et valent 0 par défaut : tous les
+        // appels existants gardent exactement leur comportement.
+        //
+        // Ils viennent de la formule que GoMining affiche lui-même :
+        //   net sat = PR + GBP − C1 − C2
+        //   GMT crédité = (net BTC − commission de réinvestissement) × BTC / GMT
+        // Vérifié au centième de pourcent sur une journée réelle : 690,32 TH,
+        // 50,0509 PR, 15 W/TH, $0,05/kWh, 5,69 % → 28,7417 GMT, exactement ce que
+        // GoMining a crédité. Le GBP pèse +0,031 %, la commission −2,25 % — c'est
+        // elle qui faisait surestimer le gain de tout utilisateur réinvestissant
+        // en GMT.
+        function calcDailyReward(hashrateTH, efficiencyWTH, elecCostKwh, discountPct, btcPrice, satPerTH,
+                                 gbpSatPerTh, reinvestCommissionRate) {
             if (!btcPrice || !state.gmtPrice) return null;
             const gmtPrice = state.gmtPrice;
             const discountMult = 1 - discountPct / 100;
+            // Ces deux termes décrivent le COMPTE, pas l'appel : on les lit dans
+            // `state`, alimenté par la synchro. Les paramètres ne servent que
+            // d'override explicite (tests, projections hypothétiques). Sans ça il
+            // faudrait les passer à trente sites d'appel, dont on oublierait
+            // forcément un.
+            const gbpSat = (gbpSatPerTh !== undefined && gbpSatPerTh !== null)
+                ? gbpSatPerTh : (state.gbpSatPerTh || 0);
+            const commission = (reinvestCommissionRate !== undefined && reinvestCommissionRate !== null)
+                ? reinvestCommissionRate : (state.reinvestCommissionRate || 0);
 
-            // PR per TH in GMT
-            const prBtcPerTH = satPerTH * 1e-8;
+            // PR per TH in GMT — GBP s'ajoute au pool reward, avant les coûts
+            const prBtcPerTH = (satPerTH + gbpSat) * 1e-8;
             const prGmtPerTH = prBtcPerTH * btcPrice / gmtPrice;
 
             // C1: electricity per TH in GMT (after discount)
@@ -2014,7 +2035,6 @@
             // C2: service per TH in GMT (after discount)
             const c2GmtPerTH = (SERVICE_COST_PER_TH / gmtPrice) * discountMult;
 
-            // Net per TH in GMT
             const feesGmtPerTH = c1GmtPerTH + c2GmtPerTH;
             const netGmtPerTH = prGmtPerTH - feesGmtPerTH;
 
@@ -2028,6 +2048,13 @@
             const feesBtc = totalFeesGmt * gmtPrice / btcPrice;
             const netBtc = totalNetGmt * gmtPrice / btcPrice;
 
+            // La commission de réinvestissement ne s'applique QU'À la conversion
+            // en GMT. Le gain en BTC, lui, est intact — quelqu'un qui encaisse en
+            // BTC ne la paie jamais. L'appliquer partout ferait diverger le sat/TH
+            // de ce que GoMining affiche (17,8844), alors que c'est le montant en
+            // GMT qui est réduit (28,7417 au lieu de 29,4033).
+            const netGmtCredited = totalNetGmt * (1 - commission);
+
             return {
                 grossBtc,
                 grossUsd: totalPrGmt * gmtPrice,
@@ -2037,7 +2064,8 @@
                 feesGmt: totalFeesGmt,
                 netBtc,
                 netUsd: totalNetGmt * gmtPrice,
-                netGmt: totalNetGmt,
+                netGmt: netGmtCredited,
+                netGmtBeforeCommission: totalNetGmt,
                 // Per TH details (sats)
                 prSat: satPerTH,
                 c1Sat: Math.round(c1GmtPerTH * gmtPrice / btcPrice * 1e8),
@@ -3409,6 +3437,11 @@
             // Reste null si le relevé n'a pas été capté — le Portfolio doit
             // pouvoir distinguer « aucun dépôt » de « je n'en sais rien ».
             if (data.capital) state.capital = data.capital;
+
+            // Termes complémentaires de la formule GoMining, mesurés sur le dernier
+            // jour complet : bonus GoBTC Pay et commission de réinvestissement.
+            if (data.income?.gbpSatPerTh !== undefined) state.gbpSatPerTh = data.income.gbpSatPerTh;
+            if (data.income?.reinvestCommissionRate !== undefined) state.reinvestCommissionRate = data.income.reinvestCommissionRate;
 
             // Discounts (API returns decimals: 0.03 = 3%)
             // The API is the source of truth — set discountFromApi so the

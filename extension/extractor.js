@@ -1227,6 +1227,15 @@
                     const sumC1 = incomes.reduce((s, i) => s + (i.c1Value || 0), 0);
                     const sumC2 = incomes.reduce((s, i) => s + (i.c2Value || 0), 0);
                     const sumPoolReward = incomes.reduce((s, i) => s + (i.metaData?.poolReward || 0), 0);
+                    // Deux termes que le simulateur ignorait, tous deux dans metaData.
+                    // GBP (« GoBTC Pay bonus ») s'ajoute au PR : +0,031 %, négligeable
+                    // mais présent dans la formule affichée par GoMining.
+                    // La commission de réinvestissement, elle, pèse 2,25 % : c'est ce
+                    // que GoMining prélève en convertissant les gains BTC en GMT. Sans
+                    // elle, tout utilisateur qui réinvestit en GMT voit son gain
+                    // surestimé d'autant.
+                    const sumGoBtcPayBonus = incomes.reduce((s, i) => s + (i.metaData?.goBtcPayBonus || 0), 0);
+                    const sumReinvestCommission = incomes.reduce((s, i) => s + (i.metaData?.reinvestmentCommissionBtc || 0), 0);
                     const sumMaintGmt = incomes.reduce((s, i) => s + (i.maintenanceForWithdrawInGmt || 0), 0);
                     const sumGmtIncome = incomes.reduce((s, i) => s + (i.gmtIncomeBasedOnBtcIncome || 0), 0);
 
@@ -1246,6 +1255,8 @@
                         c1: sumC1,
                         c2: sumC2,
                         poolReward: sumPoolReward,
+                        goBtcPayBonus: sumGoBtcPayBonus,
+                        reinvestCommissionBtc: sumReinvestCommission,
                         totalDiscount: main.totalDiscount,
                         gmtPrice: day.incomeStatistic?.gmtPrice,
                         btcPrice: day.incomeStatistic?.btcCourseInUsd,
@@ -1290,6 +1301,19 @@
             if (!result.prices.btcPrice && latest.btcPrice) {
                 result.prices.btcPrice = latest.btcPrice;
                 result.prices.btcPriceSource = 'reward-history';
+            }
+
+            // Termes complémentaires du dernier jour complet, en unités réutilisables :
+            // le bonus en sat/TH, et la commission en fraction du gain net.
+            if (completeDay && completeDay.power > 0) {
+                if (completeDay.goBtcPayBonus) {
+                    result.income.gbpSatPerTh = completeDay.goBtcPayBonus / completeDay.power * 1e8;
+                }
+                const netBtc = (completeDay.poolReward || 0) + (completeDay.goBtcPayBonus || 0)
+                             - (completeDay.c1 || 0) - (completeDay.c2 || 0);
+                if (netBtc > 0 && completeDay.reinvestCommissionBtc) {
+                    result.income.reinvestCommissionRate = completeDay.reinvestCommissionBtc / netBtc;
+                }
             }
 
             // PRIMARY PR source: the last COMPLETE day's poolReward / power, converted BTC→GMT
