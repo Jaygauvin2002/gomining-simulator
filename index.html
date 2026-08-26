@@ -4295,6 +4295,12 @@ function renderCalendar(history, chartEl) {
 
         // ===== REWARD HISTORY PERSISTENCE =====
         const RH_KEY = 'gomining_reward_history';
+        // v2 : les dates viennent de incomeStatistic.calculatedAt, soit un jour
+        // plus tôt que la v1 qui utilisait createdAt. Sans invalidation, les
+        // anciennes entrées cohabiteraient avec les nouvelles — les mêmes
+        // récompenses sous deux dates, un calendrier doublé, et un « dernier jour
+        // complet » choisi sur une entrée fantôme, d'où un PR faux.
+        const RH_VERSION = 'v2';
 
         // Returns the last reward-history entry that's NOT today's partial day,
         // or NULL if no complete day exists (e.g. fresh sync with only today).
@@ -4335,18 +4341,27 @@ function renderCalendar(history, chartEl) {
         function saveRewardHistory(history) {
             try {
                 localStorage.setItem(RH_KEY, JSON.stringify(history));
+                localStorage.setItem(RH_KEY + '_ver', RH_VERSION);
             } catch(e) { /* quota exceeded — ignore */ }
         }
 
         function loadRewardHistory() {
             try {
+                if (localStorage.getItem(RH_KEY + '_ver') !== RH_VERSION) {
+                    localStorage.removeItem(RH_KEY);
+                    localStorage.setItem(RH_KEY + '_ver', RH_VERSION);
+                    return [];   // l'extension le reconstruit à la prochaine synchro
+                }
                 return JSON.parse(localStorage.getItem(RH_KEY)) || [];
             } catch(e) { return []; }
         }
 
         // ===== PERFORMANCE TRACKING =====
         const PERF_KEY = 'gomining_performance';
-        const PERF_VERSION = 'v3'; // Bump to invalidate old data
+        // v4 : les entrées v3 ont été enregistrées contre des dates décalées d'un
+        // jour (avant le passage à calculatedAt). Comparer un « réel » du 26 à un
+        // « projeté » du 25 fausse le score de précision.
+        const PERF_VERSION = 'v4';
 
         function loadPerformance() {
             try {
