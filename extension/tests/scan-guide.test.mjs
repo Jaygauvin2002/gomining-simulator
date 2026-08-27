@@ -69,6 +69,36 @@ const entry = (url) => ({ url, data: {} });
   check(!threw && Object.values(c).every(v => v === false), 'pools absents → tout décoché sans exception');
 }
 
+// ---------- l'union extension ∪ site ----------
+// `coverage` seul mesurait ce que l'EXTENSION détient, or elle purge à 24 h,
+// alors que le site persiste l'historique de récompenses, le capital et le
+// staking. La liste affichait donc « Rewards non capté » à un utilisateur dont
+// le calendrier était plein — elle contredisait l'écran d'à côté.
+{
+  const union = (ext, own) => {
+    const out = {};
+    for (const k of new Set([...Object.keys(ext), ...Object.keys(own)])) {
+      out[k] = ext[k] === true || own[k] === true;
+    }
+    return out;
+  };
+  // Le cas qui a été signalé : l'extension a purgé, le site a gardé.
+  const u = union({ miners: true, rewards: false }, { rewards: true, transactions: true });
+  check(u.rewards === true, 'le site l’emporte quand le cache de l’extension a expiré');
+  check(u.miners === true, 'ce que seule l’extension sait reste coché');
+  check(u.transactions === true, 'ce que seul le site sait est coché aussi');
+  check(union({ rewards: true }, { rewards: false }).rewards === true,
+        'un élément coché ne se décoche jamais');
+
+  check(/siteCoverage/.test(HTML), 'siteCoverage doit exister');
+  check(/ext\[k\] === true \|\| own\[k\] === true/.test(HTML),
+        'le rendu doit faire l’UNION, pas lire la couverture de l’extension seule');
+  // Les sources côté site doivent être les données persistées, pas des devinettes.
+  for (const src of ['state.rewardHistory', 'state.staking', 'state.capital']) {
+    check(HTML.includes(src), `siteCoverage doit s’appuyer sur ${src}`);
+  }
+}
+
 // ---------- côté site ----------
 check(/SCAN_TARGETS/.test(HTML), 'la liste des cibles doit exister');
 check(/renderScanChecklist/.test(HTML), 'le rendu doit exister');

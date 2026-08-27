@@ -3480,6 +3480,7 @@
             // valeur erronée y pèse lourd — $0,06 au lieu de $0,05 retirait 20 %
             // sur la moitié des frais, soit $2,30/jour sur cette ferme.
             // Gains à vie, tenus par GoMining — Miner Wars compris.
+            if (data.miner?.bonusMinerPower > 0) state.bonusMinerPower = data.miner.bonusMinerPower;
             if (data.income?.lifetime?.btc > 0) {
                 state.lifetimeIncome = data.income.lifetime;
                 try { localStorage.setItem('gms_lifetime_income', JSON.stringify(data.income.lifetime)); } catch (e) {}
@@ -6297,11 +6298,42 @@ function renderCalendar(history, chartEl) {
               name: 'scan_p_home',    unlocks: 'scan_u_home' },
         ];
 
+        // Ce que le SITE possède réellement, indépendamment de ce que l'extension
+        // a encore en cache.
+        //
+        // `coverage` seul mesurait la mauvaise chose : l'extension purge à 24 h,
+        // alors que le site persiste l'historique de récompenses, le capital et le
+        // staking. Un utilisateur voyait donc « Rewards non capté » alors que son
+        // calendrier était rempli — la liste contredisait l'écran d'à côté.
+        //
+        // Une automatisation est débloquée dès que le site peut l'afficher. On fait
+        // donc l'UNION des deux, et un élément coché ne se décoche jamais parce
+        // qu'un cache a expiré.
+        function siteCoverage() {
+            const cap = state.capital || {};
+            return {
+                miners:       (parseFloat(document.getElementById('hashrate')?.value) || 0) > 0,
+                rewards:      (state.rewardHistory || []).length > 0,
+                transactions: (cap.transactions || []).length > 0 || !!cap.gmtEquivalent,
+                wallet:       (parseFloat(document.getElementById('gmt-prepaid')?.value) || 0) > 0
+                              || (state.btcWalletBalance || 0) > 0,
+                staking:      !!(state.staking && (state.staking.gmtLocked || state.staking.votes)),
+                bonusMiner:   !!state.bonusMinerPower,
+                homePage:     !!(state.apiGmtPrice || state.apiBtcPrice),
+                discount:     (parseFloat(document.getElementById('discount')?.value) || 0) > 0,
+            };
+        }
+
         function renderScanChecklist() {
             const list = document.getElementById('scan-list');
             if (!list) return;
-            const cov = state.coverage || {};
-            const hasAny = Object.keys(cov).length > 0;
+            const ext = state.coverage || {};
+            const own = siteCoverage();
+            const cov = {};
+            for (const k of new Set([...Object.keys(ext), ...Object.keys(own)])) {
+                cov[k] = ext[k] === true || own[k] === true;
+            }
+            const hasAny = Object.values(cov).some(Boolean) || Object.keys(ext).length > 0;
             list.textContent = '';
 
             for (const target of SCAN_TARGETS) {
