@@ -3884,13 +3884,23 @@ function renderCalendar(history, chartEl) {
                         // smaller than what GoMining shows.
                         valueText = computeDayNetGmt(day).toFixed(2);
                     } else if (type === 'TH') {
-                        // Ni 12,34 ni aucun autre nombre magique : le taux vient de
-                        // l'historique (revenu net d'un jour ÷ TH gagnés le lendemain),
-                        // sinon du champ que l'utilisateur peut régler. Le taux suit le
-                        // prix du GMT : 12,08 $ en juillet, ~10,19 $ fin août. Figé, il
-                        // affichait 0,859 TH pour 1,04 TH réellement gagnés.
-                        const thGained = day.valueBtc * btcRef / upgradeRate() * (1 + TH_BONUS);
-                        valueText = '+' + thGained.toFixed(3);
+                        // Pour un jour PASSÉ, les TH gagnés ne sont pas à estimer :
+                        // ils sont observables. La puissance du lendemain moins celle
+                        // du jour donne exactement ce qui a été ajouté, sans taux, sans
+                        // bonus, sans hypothèse.
+                        //
+                        // On n'estime que si le lendemain manque encore. Et l'estimation
+                        // reposait sur un taux figé à 12,34 $ : il valait 12,08 $ en
+                        // juillet et ~10,19 $ fin août, d'où 0,859 TH affiché pour 1,04
+                        // réellement gagnés. Le taux est désormais déduit — mais rien ne
+                        // vaut la mesure quand elle existe.
+                        const observed = observedThGain(day.date);
+                        if (observed !== null) {
+                            valueText = '+' + observed.toFixed(3);
+                        } else {
+                            const est = day.valueBtc * btcRef / upgradeRate() * (1 + TH_BONUS);
+                            valueText = '~' + est.toFixed(3);   // le tilde dit que c'est estimé
+                        }
                     }
 
                     const isToday = dateStr === todayStr;
@@ -4466,6 +4476,23 @@ function renderCalendar(history, chartEl) {
         //   1. déduit de l'historique par l'extension — exact, suit le marché
         //   2. le champ réglable par l'utilisateur
         //   3. 12,34, dernier recours
+        // TH réellement ajoutés le lendemain d'un jour donné, lus dans l'historique.
+        // Retourne null si le lendemain n'est pas encore connu — auquel cas il faut
+        // bien estimer, mais on le dira.
+        function observedThGain(dateStr) {
+            const hist = state.rewardHistory || [];
+            const byDate = new Map(hist.filter(d => d && d.date).map(d => [d.date, d]));
+            const cur = byDate.get(dateStr);
+            if (!cur || !(cur.power > 0)) return null;
+            const t = Date.parse(dateStr + 'T00:00:00Z');
+            if (!isFinite(t)) return null;
+            const nextStr = new Date(t + 86400000).toISOString().substring(0, 10);
+            const next = byDate.get(nextStr);
+            if (!next || !(next.power > 0)) return null;
+            const delta = next.power - cur.power;
+            return delta > 0 ? delta : null;
+        }
+
         function upgradeRate() {
             const derived = state.upgradeRateUsd;
             if (derived > 0) return derived;

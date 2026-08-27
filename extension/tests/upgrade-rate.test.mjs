@@ -28,8 +28,14 @@ function grab(src, name) {
   }
   throw new Error(`${name} non close`);
 }
+const RATE_WINDOW = (() => {
+  const m = SRC.match(/const RATE_WINDOW = (\d+)/);
+  if (!m) throw new Error('RATE_WINDOW introuvable');
+  return parseInt(m[1], 10);
+})();
 const derive = new Function(
-  'const TH_REINVEST_BONUS = 0.05;' + grab(SRC, 'deriveUpgradeRate') + '; return deriveUpgradeRate;')();
+  'const TH_REINVEST_BONUS = 0.05; const RATE_WINDOW = ' + RATE_WINDOW + ';'
+  + grab(SRC, 'deriveUpgradeRate') + '; return deriveUpgradeRate;')();
 
 let pass = 0; const fails = [];
 const check = (c, l) => c ? pass++ : fails.push(l);
@@ -76,7 +82,9 @@ const day = (date, power, valueBtc, btcPrice = 78000, reinvestInTH = true) =>
   // c'était le défaut de la première version de ce cas.
   d.push(day('2026-07-08', 100 + 6 * 0.175 + 0.07, 2 / 78000));
   const r = derive(d);
-  check(r.observations === 7, `7 observations dont l'aberration (obtenu ${r.observations})`);
+  // `observations` compte désormais la FENÊTRE retenue, `totalObservations` le
+  // total — ces deux assertions visaient l'ancien sens du champ.
+  check(r.totalObservations === 7, `7 observations au total dont l'aberration (obtenu ${r.totalObservations})`);
   check(Math.abs(r.usdPerTh - 12) < 0.05,
         `la médiane ignore l'aberration (obtenu ${r.usdPerTh.toFixed(2)})`);
   // La moyenne, elle, serait tirée vers le haut : c'est ce qui distingue les deux.
@@ -96,12 +104,46 @@ const day = (date, power, valueBtc, btcPrice = 78000, reinvestInTH = true) =>
   }
 }
 
+// 5bis. Le taux doit suivre le MARCHÉ, pas la moyenne d'une longue période.
+//
+//       C'est le défaut qui a persisté : la médiane sur deux mois renvoyait
+//       12,08 $ — la valeur de juillet — alors que le taux était tombé à ~10,19 $.
+//       Le calendrier restait faux malgré la déduction.
+{
+  const d = [];
+  // 20 jours à 12 $/TH…
+  for (let i = 0; i < 20; i++) {
+    const day1 = String(1 + i).padStart(2, '0');
+    d.push(day(`2026-07-${day1}`, 100 + i * 0.175, 2 / 78000));
+  }
+  // …puis 5 jours à 10 $/TH (delta plus grand pour le même revenu).
+  for (let i = 0; i < 6; i++) {
+    const day1 = String(1 + i).padStart(2, '0');
+    d.push(day(`2026-08-${day1}`, 200 + i * 0.21, 2 / 78000));
+  }
+  const r = derive(d);
+  check(Math.abs(r.usdPerTh - 10) < 0.3,
+        `le taux doit refléter les jours récents, pas les anciens (obtenu ${r.usdPerTh.toFixed(2)})`);
+  check(r.observations <= RATE_WINDOW,
+        `au plus ${RATE_WINDOW} observations retenues (obtenu ${r.observations})`);
+  check(r.totalObservations > RATE_WINDOW,
+        'le total des observations reste rapporté pour information');
+}
+
 // 6. Côté site : plus aucun nombre magique dans le calcul du calendrier.
 check(/upgradeRate\(\)/.test(HTML), 'le site doit passer par upgradeRate()');
 check(!/day\.valueBtc \* btcRef \/ 12\.34/.test(HTML), 'le 12,34 codé en dur du calendrier doit avoir disparu');
 check(/state\.upgradeRateUsd/.test(HTML), 'le taux déduit doit être consommé');
 check(/dataset\.userEdited !== '1'/.test(HTML), 'une valeur saisie par l’utilisateur ne doit pas être écrasée');
 check(/const TH_BONUS = 0\.05/.test(HTML), 'le bonus doit être une constante nommée, pas un 1.05 dispersé');
+
+// 6bis. Et pour un jour PASSÉ, on mesure au lieu d'estimer : la puissance du
+//       lendemain moins celle du jour donne les TH ajoutés, sans taux ni bonus.
+check(/function observedThGain/.test(HTML), 'observedThGain doit exister');
+check(/const observed = observedThGain\(day\.date\)/.test(HTML),
+      'la cellule TH doit préférer la mesure à l’estimation');
+check(/valueText = '~'/.test(HTML),
+      'une valeur estimée doit être marquée d’un tilde, pas présentée comme mesurée');
 
 // 7. Sur le vrai relevé : ~12,08 $, la valeur observée en juillet.
 const real = process.argv[2];
@@ -120,7 +162,7 @@ if (real && existsSync(real)) {
     console.log(`\n  --- relevé réel : $${r?.usdPerTh?.toFixed(2)} / TH sur ${r?.observations} observations ---`);
     check(r && r.usdPerTh > 11 && r.usdPerTh < 13,
           `relevé réel entre 11 et 13 $ (obtenu ${r?.usdPerTh?.toFixed(2)})`);
-    check(r.observations >= 15, `au moins 15 observations (obtenu ${r?.observations})`);
+    check(r.totalObservations >= 15, `au moins 15 observations au total (obtenu ${r?.totalObservations})`);
   }
 }
 

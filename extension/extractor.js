@@ -402,6 +402,9 @@
     // GoMining arrondit ou où un achat manuel s'ajoute donnerait une valeur
     // aberrante, et la médiane l'ignore.
     const TH_REINVEST_BONUS = 0.05;
+    // Fenêtre d'observations retenues pour le taux : assez large pour lisser un
+    // arrondi, assez courte pour suivre le prix du GMT.
+    const RATE_WINDOW = 5;
 
     function deriveUpgradeRate(history) {
         if (!Array.isArray(history) || history.length < 2) return null;
@@ -423,13 +426,19 @@
             const rate = netUsd * (1 + TH_REINVEST_BONUS) / dTh;
             // Bornes de sanité : un taux hors de cette plage vient d'un achat
             // manuel le même jour, pas du réinvestissement.
-            if (rate > 1 && rate < 100) rates.push(rate);
+            if (rate > 1 && rate < 100) rates.push({ date: cur.date, rate: rate });
         }
         if (rates.length === 0) return null;
-        rates.sort((a, b) => a - b);
+        rates.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        // Ne garder que les observations RÉCENTES : le taux suit le prix du GMT et
+        // bouge. Une médiane sur deux mois renvoyait 12,08 $ — la valeur de
+        // juillet — alors que fin août il était tombé à ~10,19 $, et le calendrier
+        // restait faux malgré la déduction.
+        const recent = rates.slice(-RATE_WINDOW).map(r => r.rate).sort((a, b) => a - b);
         return {
-            usdPerTh: rates[Math.floor(rates.length / 2)],
-            observations: rates.length,
+            usdPerTh: recent[Math.floor(recent.length / 2)],
+            observations: recent.length,
+            totalObservations: rates.length,
         };
     }
 
