@@ -2781,3 +2781,71 @@ tr.tx-auto td:first-child {
   border: 1px solid currentColor;
   vertical-align: middle;
 }
+
+/* ===== Guide de scan =====
+   Une liste d'état, pas une décoration : ce qui est capté doit se distinguer de
+   ce qui manque au premier regard, sans lire le texte. */
+.scan-guide {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border, #23303f);
+}
+.scan-guide-title {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.scan-guide-lead {
+  margin: 0 0 14px;
+  font-size: .8rem;
+  line-height: 1.5;
+  color: var(--text-dim, #8794a6);
+}
+.scan-list { margin: 0; padding: 0; list-style: none; }
+
+.scan-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-soft, #1b2431);
+}
+.scan-item:last-of-type { border-bottom: 0; }
+
+.scan-mark {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+  font-weight: 700;
+  font-size: .9rem;
+  line-height: 1.45;
+  color: var(--text-dim, #8794a6);
+}
+.scan-item.done .scan-mark { color: var(--green, #35c77b); }
+.scan-item.unknown .scan-mark { opacity: .5; }
+
+.scan-page {
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text, #e7ebf1);
+  text-decoration: none;
+}
+a.scan-page:hover { color: var(--accent, #f7931a); text-decoration: underline; }
+a.scan-page::after { content: ' ↗'; font-size: .78em; opacity: .6; }
+
+.scan-unlocks {
+  margin-top: 2px;
+  font-size: .74rem;
+  line-height: 1.45;
+  color: var(--text-dim, #8794a6);
+  max-width: 52ch;
+}
+/* Une ligne déjà captée n'a plus besoin d'attirer l'œil. */
+.scan-item.done .scan-page { color: var(--text-dim, #8794a6); font-weight: 500; }
+
+.scan-note {
+  margin-top: 12px;
+  font-size: .72rem;
+  line-height: 1.45;
+  color: var(--text-dim, #8794a6);
+}

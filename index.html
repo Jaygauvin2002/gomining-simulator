@@ -640,6 +640,16 @@
                 <div class="onboarding-step"><span class="step-num">3</span><div data-i18n="guide_ns3">Visit your <strong>Rewards</strong> page once, then come back here. Everything syncs on its own from then on.</div></div>
             </div>
             <p style="margin:18px 0 0;font-size:0.78em;line-height:1.5;color:var(--text-dim);text-align:center;" data-i18n="guide_store_note">Installing from the store means the extension updates itself — no reloading by hand, ever.</p>
+
+            <!-- Liste vivante : chaque automatisation dépend d'un endpoint, et chaque
+                 endpoint n'est appelé que sur SA page. Un utilisateur resté sur
+                 « My miners » a une puissance juste et un historique vide, sans que
+                 rien ne le lui dise. Rendue par renderScanChecklist(). -->
+            <div class="scan-guide" id="scan-guide">
+                <h3 class="scan-guide-title" data-i18n="scan_title">What to open on GoMining</h3>
+                <p class="scan-guide-lead" data-i18n="scan_lead">Each page feeds a different part of GoMining's data. Open the ones you want unlocked — once each. After that the extension keeps them up to date on its own.</p>
+                <ul class="scan-list" id="scan-list"></ul>
+            </div>
         </div>
     </div>
 
@@ -3444,6 +3454,11 @@
             // Capital externe, reconstitué depuis le relevé de transactions.
             // Reste null si le relevé n'a pas été capté — le Portfolio doit
             // pouvoir distinguer « aucun dépôt » de « je n'en sais rien ».
+            // Couverture des pages GoMining : ce qui est capté, ce qui manque.
+            if (data.coverage) {
+                state.coverage = data.coverage;
+                try { localStorage.setItem('gms_coverage', JSON.stringify(data.coverage)); } catch (e) {}
+            }
             if (data.capital) {
                 state.capital = mergeCapital(state.capital, data.capital);
                 saveCapital(state.capital);
@@ -3590,6 +3605,9 @@
             // « d'après tes saisies manuelles » alors que le relevé était là.
             if (typeof updatePortfolio === 'function') {
                 try { updatePortfolio(); } catch (e) {}
+            }
+            if (typeof renderScanChecklist === 'function') {
+                try { renderScanChecklist(); } catch (e) {}
             }
         }
 
@@ -5109,6 +5127,15 @@ function renderCalendar(history, chartEl) {
                 port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
                 port_bd_no_cats: 'captured before categorisation existed — reload the extension',
                 port_bd_unknown: 'uncategorised movement types seen: {types} — tell us and we will map them',
+                scan_title: 'What to open on GoMining',
+                scan_lead: 'Each page feeds a different part of your data. Open the ones you want unlocked — once each. After that the extension keeps them up to date on its own.',
+                scan_p_miners: 'My miners', scan_u_miners: 'Farm power, miner count, efficiency, discount and balances',
+                scan_p_rewards: 'Rewards', scan_u_rewards: 'Reward history, pool reward and your real daily profit',
+                scan_p_tx: 'Wallet › Transactions', scan_u_tx: 'Invested capital and the spending breakdown — scroll the list once',
+                scan_p_lock: 'veGMT lock page', scan_u_lock: 'Locked GMT and staking rewards',
+                scan_p_home: 'GoMining home', scan_u_home: 'Live GMT and BTC prices, and today\'s partial pool reward',
+                scan_note_live: 'Ticked items are already captured. The extension refreshes them whenever you browse GoMining.',
+                scan_note_none: 'No extension detected yet — install it first and this list will show what is captured.',
                 tx_auto: 'auto', tx_count_label: 'transactions',
                 tx_from_gomining: 'from GoMining', tx_manual: 'entered by hand',
                 port_asset_hint: 'TH valued at the in-app upgrade rate — what it would cost to rebuild your farm today, not a resale quote. Plus locked and liquid balances.',
@@ -5378,6 +5405,15 @@ function renderCalendar(history, chartEl) {
                 port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
                 port_bd_no_cats: 'capturé avant la catégorisation — recharge l\'extension',
                 port_bd_unknown: 'types de mouvement non catégorisés : {types} — signale-le et on les mappera',
+                scan_title: 'Quelles pages ouvrir sur GoMining',
+                scan_lead: 'Chaque page alimente une partie différente de tes données. Ouvre celles que tu veux débloquer — une fois chacune. Ensuite l\'extension les tient à jour toute seule.',
+                scan_p_miners: 'My miners', scan_u_miners: 'Puissance de ferme, nombre de mineurs, efficacité, remise et soldes',
+                scan_p_rewards: 'Rewards', scan_u_rewards: 'Historique des récompenses, pool reward et ton vrai profit quotidien',
+                scan_p_tx: 'Wallet › Transactions', scan_u_tx: 'Capital investi et ventilation des dépenses — fais défiler la liste une fois',
+                scan_p_lock: 'Page veGMT lock', scan_u_lock: 'GMT verrouillés et récompenses de staking',
+                scan_p_home: 'Accueil GoMining', scan_u_home: 'Prix GMT et BTC en direct, et le pool reward partiel du jour',
+                scan_note_live: 'Les éléments cochés sont déjà captés. L\'extension les rafraîchit à chaque passage sur GoMining.',
+                scan_note_none: 'Aucune extension détectée — installe-la d\'abord et cette liste montrera ce qui est capté.',
                 tx_auto: 'auto', tx_count_label: 'transactions',
                 tx_from_gomining: 'depuis GoMining', tx_manual: 'saisies à la main',
                 port_asset_hint: 'TH valorisés au taux d\'upgrade in-app — ce que coûterait de reconstituer ta ferme aujourd\'hui, pas une cote de revente. Plus tes soldes verrouillés et liquides.',
@@ -5503,6 +5539,9 @@ function renderCalendar(history, chartEl) {
         }
 
         function showExtensionGuide() {
+            // Redessiner à l'ouverture : la couverture a pu changer depuis le
+            // dernier rendu, et c'est le moment où l'utilisateur la lit.
+            try { renderScanChecklist(); } catch (e) {}
             document.getElementById('extension-guide').style.display = 'flex';
             document.getElementById('onboarding').style.display = 'none';
         }
@@ -6200,6 +6239,66 @@ function renderCalendar(history, chartEl) {
             document.getElementById('port-transactions').innerHTML = tHtml;
         }
 
+        // ===== GUIDE DE SCAN =====
+        //
+        // Les chemins sont ceux réellement observés dans les captures
+        // (`dom.page`). Ceux qu'on n'a jamais vus ne sont PAS liés : envoyer
+        // quelqu'un sur une URL devinée est pire que de ne pas l'envoyer.
+        const SCAN_TARGETS = [
+            { key: 'miners',       path: '/nft-miners',
+              name: 'scan_p_miners',  unlocks: 'scan_u_miners' },
+            { key: 'rewards',      path: '/nft-rewards/solo',
+              name: 'scan_p_rewards', unlocks: 'scan_u_rewards' },
+            { key: 'transactions', path: '/finance/wallets/virtual/overview/transactions',
+              name: 'scan_p_tx',      unlocks: 'scan_u_tx' },
+            { key: 'staking',      path: null,
+              name: 'scan_p_lock',    unlocks: 'scan_u_lock' },
+            { key: 'homePage',     path: '/',
+              name: 'scan_p_home',    unlocks: 'scan_u_home' },
+        ];
+
+        function renderScanChecklist() {
+            const list = document.getElementById('scan-list');
+            if (!list) return;
+            const cov = state.coverage || {};
+            const hasAny = Object.keys(cov).length > 0;
+            list.textContent = '';
+
+            for (const target of SCAN_TARGETS) {
+                const done = cov[target.key] === true;
+                const li = document.createElement('li');
+                li.className = 'scan-item' + (done ? ' done' : '') + (hasAny ? '' : ' unknown');
+
+                const mark = document.createElement('span');
+                mark.className = 'scan-mark';
+                // Sans extension connectée on ne prétend pas savoir : un rond vide
+                // ne veut pas dire « pas fait », il veut dire « on ne sait pas ».
+                mark.textContent = !hasAny ? '·' : (done ? '✓' : '○');
+                li.appendChild(mark);
+
+                const body = document.createElement('div');
+                const title = target.path
+                    ? Object.assign(document.createElement('a'), {
+                        href: 'https://app.gomining.com' + target.path,
+                        target: '_blank', rel: 'noopener',
+                        className: 'scan-page', textContent: t(target.name) })
+                    : Object.assign(document.createElement('span'),
+                        { className: 'scan-page', textContent: t(target.name) });
+                body.appendChild(title);
+                const sub = document.createElement('div');
+                sub.className = 'scan-unlocks';
+                sub.textContent = t(target.unlocks);
+                body.appendChild(sub);
+                li.appendChild(body);
+                list.appendChild(li);
+            }
+
+            const note = document.createElement('li');
+            note.className = 'scan-note';
+            note.textContent = hasAny ? t('scan_note_live') : t('scan_note_none');
+            list.appendChild(note);
+        }
+
 // ===== INIT =====
         loadFeeMode();
         loadSettings();
@@ -6377,6 +6476,7 @@ function renderCalendar(history, chartEl) {
         state.rewardHistory = loadRewardHistory();
         state.capital = loadCapital();   // survit à la purge 24 h de l'extension
         try { state.lifetimeIncome = JSON.parse(localStorage.getItem('gms_lifetime_income')) || null; } catch (e) {}
+        try { state.coverage = JSON.parse(localStorage.getItem('gms_coverage')) || null; } catch (e) {}
         if (state.rewardHistory.length > 0) {
             document.getElementById('dash-history-section').style.display = 'block';
             showDashboardCalendar(state.rewardHistory);

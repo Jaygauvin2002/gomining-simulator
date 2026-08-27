@@ -18,6 +18,7 @@ node extension/tests/migration.test.mjs
 node extension/tests/daily-avg.test.mjs
 node extension/tests/portfolio-refresh.test.mjs
 node extension/tests/breakdown-pct.test.mjs
+node extension/tests/scan-guide.test.mjs [chemin-vers-un-export.json]
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -66,6 +67,8 @@ Clique **Exporter JSON** dans le panneau, puis vérifie :
 - [ ] **ferme l'onglet, rouvre gmsim.ca sans repasser sur GoMining** : le capital
       et le coût par TH doivent toujours être là. Le relevé brut est purgé au bout
       de 24 h par l'extension, c'est le résultat du calcul qui est conservé.
+- [ ] ouvre « Connect Extension » : la liste « Quelles pages ouvrir sur GoMining »
+      doit cocher les pages visitées et laisser les autres décochées
 - [ ] le Portfolio indique « Depuis tes dépôts GoMining » sous le capital, et
       non le message de repli — sinon le relevé n'a pas été capté assez loin
       (il faut aussi les `asset-conversion`, pas seulement les dépôts, pour
@@ -134,6 +137,7 @@ node extension/tests/migration.test.mjs
 node extension/tests/daily-avg.test.mjs
 node extension/tests/portfolio-refresh.test.mjs
 node extension/tests/breakdown-pct.test.mjs
+node extension/tests/scan-guide.test.mjs [chemin-vers-un-export.json]
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le

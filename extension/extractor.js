@@ -388,6 +388,36 @@
         return null;
     }
 
+    // === Couverture : quelles pages GoMining ont été visitées ================
+    //
+    // Chaque automatisation dépend d'un endpoint précis, et chaque endpoint n'est
+    // appelé que sur SA page. Un utilisateur qui reste sur « My miners » a une
+    // puissance juste et un historique vide, sans que rien ne le lui dise — c'est
+    // ce qui a coûté plusieurs allers-retours pendant la mise au point.
+    //
+    // On expose donc ce qu'on a réellement, pour que le site puisse afficher la
+    // liste de ce qui reste à visiter plutôt que de laisser deviner.
+    function computeCoverage() {
+        const seen = (re) => {
+            for (const pool of [DATA.miners, DATA.rewards]) {
+                for (const e of Object.values(pool || {})) {
+                    if (re.test(e?.url || '')) return true;
+                }
+            }
+            return false;
+        };
+        return {
+            miners:       seen(/\/nft\/get-my/i),
+            rewards:      seen(/\/nft-income\/find-aggregated-by-date/i),
+            transactions: seen(/\/wallet\/transaction-history/i),
+            wallet:       seen(/\/wallet\/find-by-user/i),
+            staking:      seen(/\/ve-gomining-lock/i),
+            bonusMiner:   seen(/bonus-miner/i),
+            homePage:     seen(/\/home-page\/get-info/i),
+            discount:     seen(/get-my-nft-discount/i),
+        };
+    }
+
     // === Capital externe, depuis le relevé de transactions ===================
     //
     // Le seul dénominateur légitime d'un ROI : ce qui a franchi la frontière du
@@ -1489,6 +1519,7 @@
         // trompeur : le site doit pouvoir faire la différence entre « aucun
         // dépôt » et « je n'en sais rien ».
         result.capital = computeCapital();
+        result.coverage = computeCoverage();
 
         return result;
     }
