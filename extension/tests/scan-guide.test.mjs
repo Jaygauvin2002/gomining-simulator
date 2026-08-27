@@ -99,10 +99,26 @@ const entry = (url) => ({ url, data: {} });
   }
 }
 
+// ---------- ne jamais écraser par du vide ----------
+// L'extension envoie `staking: {}` quand son cache 24 h a expiré — un objet vide,
+// donc « vrai » en JS. L'affecter sans condition effaçait à chaque synchro les
+// données du lock, et la ligne veGMT ne se cochait JAMAIS, même juste après avoir
+// visité la page.
+check(/data\.staking && \(data\.staking\.gmtLocked \|\| data\.staking\.votes\)/.test(HTML),
+      'le staking ne doit être remplacé que s’il contient réellement des données');
+check(!/if \(data\.staking\) \{\s*\n\s*state\.staking = data\.staking;/.test(HTML),
+      'l’affectation inconditionnelle du staking ne doit plus exister');
+// Et la couverture persistée doit être unionnée à l'écriture, pas seulement au rendu.
+check(/prev\[k\] === true \|\| data\.coverage\[k\] === true/.test(HTML),
+      'la couverture doit être unionnée avant d’être persistée');
+
 // ---------- côté site ----------
 check(/SCAN_TARGETS/.test(HTML), 'la liste des cibles doit exister');
 check(/renderScanChecklist/.test(HTML), 'le rendu doit exister');
-check(/state\.coverage = data\.coverage/.test(HTML), 'la couverture doit être lue depuis la synchro');
+// La couverture doit venir de la synchro, mais unionnée — l'affectation directe
+// a été remplacée exprès, l'ancienne assertion la cherchait encore.
+check(/data\.coverage/.test(HTML) && /state\.coverage = merged/.test(HTML),
+      'la couverture doit être lue depuis la synchro et unionnée avant affectation');
 check(/gms_coverage/.test(HTML), 'la couverture doit être persistée');
 
 // 4. Une cible sans chemin vérifié ne doit PAS être transformée en lien :

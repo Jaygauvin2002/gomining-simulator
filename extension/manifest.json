@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GMSim — Miner Sync (DEV)",
-  "version": "4.2",
+  "version": "4.3",
   "description": "Sync your GoMining NFT miner data into GMSim, an independent mining profitability simulator. No account, no tracking.",
   "icons": {
     "16": "icon-16.png",

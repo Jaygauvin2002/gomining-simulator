@@ -3464,9 +3464,17 @@
             // Reste null si le relevé n'a pas été capté — le Portfolio doit
             // pouvoir distinguer « aucun dépôt » de « je n'en sais rien ».
             // Couverture des pages GoMining : ce qui est capté, ce qui manque.
+            // Même raisonnement pour la couverture : on garde l'union de ce qu'on a
+            // déjà vu et de ce qui arrive. Un endpoint capté hier puis purgé ne
+            // doit pas faire régresser la liste.
             if (data.coverage) {
-                state.coverage = data.coverage;
-                try { localStorage.setItem('gms_coverage', JSON.stringify(data.coverage)); } catch (e) {}
+                const prev = state.coverage || {};
+                const merged = {};
+                for (const k of new Set([...Object.keys(prev), ...Object.keys(data.coverage)])) {
+                    merged[k] = prev[k] === true || data.coverage[k] === true;
+                }
+                state.coverage = merged;
+                try { localStorage.setItem('gms_coverage', JSON.stringify(merged)); } catch (e) {}
             }
             if (data.capital) {
                 state.capital = mergeCapital(state.capital, data.capital);
@@ -3590,7 +3598,14 @@
                 if (typeof updateStrategyPriceHints === 'function') updateStrategyPriceHints();
             }
 
-            if (data.staking) {
+            // `data.staking` vaut `{}` — un objet VIDE, donc « vrai » — quand
+            // l'extension n'a pas les données du lock, c'est-à-dire dès que son
+            // cache 24 h a expiré. L'affecter sans condition effaçait donc à
+            // chaque synchro ce qu'on avait : la ligne veGMT ne se cochait jamais,
+            // même juste après avoir visité la page. Même piège que pour le
+            // capital, et la même règle s'applique : on ne remplace que par
+            // quelque chose de plus riche.
+            if (data.staking && (data.staking.gmtLocked || data.staking.votes)) {
                 state.staking = data.staking;
                 try { localStorage.setItem('gms_staking', JSON.stringify(data.staking)); } catch (e) {}
             }
