@@ -388,6 +388,51 @@
         return null;
     }
 
+    // === Taux d'upgrade réel, déduit de l'historique =========================
+    //
+    // Le simulateur écrivait 12,34 $/TH en dur. Or ce taux suit le prix du GMT et
+    // bouge : sur 19 jours consécutifs de juillet il valait 12,08 $ à un cent
+    // près, et une observation du 26 août implique ~10,19 $. Codé en dur, il
+    // affichait 0,859 TH là où l'utilisateur en avait gagné 1,04.
+    //
+    // Il se déduit exactement quand deux jours consécutifs ont réinvesti en TH :
+    //   taux = revenu net du jour N × (1 + bonus) / (puissance N+1 − puissance N)
+    //
+    // On prend la MÉDIANE des observations plutôt que la dernière : un jour où
+    // GoMining arrondit ou où un achat manuel s'ajoute donnerait une valeur
+    // aberrante, et la médiane l'ignore.
+    const TH_REINVEST_BONUS = 0.05;
+
+    function deriveUpgradeRate(history) {
+        if (!Array.isArray(history) || history.length < 2) return null;
+        const days = history
+            .filter(d => d && d.date && !d.partial && d.power > 0)
+            .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        const rates = [];
+        for (let i = 1; i < days.length; i++) {
+            const prev = days[i - 1], cur = days[i];
+            // Jours consécutifs seulement : un trou (cinq semaines en Miner Wars,
+            // par exemple) rendrait le delta de puissance ininterprétable.
+            const gap = (Date.parse(cur.date) - Date.parse(prev.date)) / 86400000;
+            if (gap !== 1) continue;
+            if (!prev.reinvestInTH) continue;
+            const dTh = cur.power - prev.power;
+            if (!(dTh > 0)) continue;
+            const netUsd = (prev.valueBtc || 0) * (prev.btcPrice || 0);
+            if (!(netUsd > 0)) continue;
+            const rate = netUsd * (1 + TH_REINVEST_BONUS) / dTh;
+            // Bornes de sanité : un taux hors de cette plage vient d'un achat
+            // manuel le même jour, pas du réinvestissement.
+            if (rate > 1 && rate < 100) rates.push(rate);
+        }
+        if (rates.length === 0) return null;
+        rates.sort((a, b) => a - b);
+        return {
+            usdPerTh: rates[Math.floor(rates.length / 2)],
+            observations: rates.length,
+        };
+    }
+
     // === Couverture : quelles pages GoMining ont été visitées ================
     //
     // Chaque automatisation dépend d'un endpoint précis, et chaque endpoint n'est
@@ -1520,6 +1565,12 @@
         // dépôt » et « je n'en sais rien ».
         result.capital = computeCapital();
         result.coverage = computeCoverage();
+
+        const upg = deriveUpgradeRate(result.rewardHistory);
+        if (upg) {
+            result.income.upgradeRateUsd = upg.usdPerTh;
+            result.income.upgradeRateObs = upg.observations;
+        }
 
         return result;
     }

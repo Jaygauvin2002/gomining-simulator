@@ -20,6 +20,7 @@ node extension/tests/portfolio-refresh.test.mjs
 node extension/tests/breakdown-pct.test.mjs
 node extension/tests/scan-guide.test.mjs [chemin-vers-un-export.json]
 node extension/tests/staleness.test.mjs
+node extension/tests/upgrade-rate.test.mjs [chemin-vers-un-export.json]
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -109,6 +110,19 @@ Sur `gmsim.ca` (ou en local) :
 - [ ] Pool Reward / sat-per-TH cohérents
 - [ ] pas d'erreur dans la console
 
+## 4ter. Règle sur les tests
+
+**Vérifier que le sabotage change vraiment le comportement.** Un sabotage sans
+effet donne un faux vert, et le 2026-08-27 deux fixtures de `upgrade-rate` sont
+passées pour la mauvaise raison : le trou de dates et la valeur aberrante étaient
+tous deux rejetés par les bornes de sanité avant d'atteindre la logique visée. Le
+test affirmait couvrir deux comportements qu'il ne touchait pas.
+
+Corollaire : préférer les tests qui **rejouent la logique** (les cinq paliers de
+`staleness`, les rejeux de `capital`) à ceux qui vérifient la **forme du code**.
+Sur cette journée, cinq assertions de forme se sont périmées contre du code
+correct ; aucun rejeu de logique ne l'a fait.
+
 ## 4bis. Règle sur les données stockées
 
 **Migrer, jamais jeter.** Un changement de format qui invalide un stockage doit
@@ -142,6 +156,7 @@ node extension/tests/portfolio-refresh.test.mjs
 node extension/tests/breakdown-pct.test.mjs
 node extension/tests/scan-guide.test.mjs [chemin-vers-un-export.json]
 node extension/tests/staleness.test.mjs
+node extension/tests/upgrade-rate.test.mjs [chemin-vers-un-export.json]
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le

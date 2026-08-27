@@ -1255,7 +1255,7 @@
                     <div class="form-group">
                         <label data-i18n="lbl_cost_per_th_upg">Price per TH/s ($) — Upgrade Existing</label>
                         <input type="number" id="cost-per-th-upgrade" value="12.34" min="1" step="0.5">
-                        <span class="hint" data-i18n="hint_cost_per_th_upg">$12.34/TH (confirmed GoMining app)</span>
+                        <span class="hint" data-i18n="hint_cost_per_th_upg">Auto-filled from your own history — it follows the GMT price</span>
                     </div>
                     <div class="form-group">
                         <label data-i18n="lbl_new_efficiency">New/Upgrade Efficiency (W/TH)</label>
@@ -3489,6 +3489,21 @@
             // sur la moitié des frais, soit $2,30/jour sur cette ferme.
             // Gains à vie, tenus par GoMining — Miner Wars compris.
             if (data.miner?.bonusMinerPower > 0) state.bonusMinerPower = data.miner.bonusMinerPower;
+
+            // Taux d'upgrade déduit de l'historique : il remplace le nombre codé
+            // en dur et renseigne les champs, qui restent modifiables.
+            if (data.income?.upgradeRateUsd > 0) {
+                state.upgradeRateUsd = data.income.upgradeRateUsd;
+                try { localStorage.setItem('gms_upgrade_rate', JSON.stringify(data.income.upgradeRateUsd)); } catch (e) {}
+                for (const id of ['cost-per-th-upgrade', 'reinv-cost-per-th', 'strategy-cost-per-th']) {
+                    const el = document.getElementById(id);
+                    // Ne jamais écraser une valeur que l'utilisateur a saisie
+                    // lui-même : le champ du Strategy Lab marque ses éditions.
+                    if (el && el.dataset.userEdited !== '1') {
+                        el.value = data.income.upgradeRateUsd.toFixed(2);
+                    }
+                }
+            }
             if (data.income?.lifetime?.btc > 0) {
                 state.lifetimeIncome = data.income.lifetime;
                 try { localStorage.setItem('gms_lifetime_income', JSON.stringify(data.income.lifetime)); } catch (e) {}
@@ -3869,7 +3884,12 @@ function renderCalendar(history, chartEl) {
                         // smaller than what GoMining shows.
                         valueText = computeDayNetGmt(day).toFixed(2);
                     } else if (type === 'TH') {
-                        const thGained = day.valueBtc * btcRef / 12.34 * 1.05;
+                        // Ni 12,34 ni aucun autre nombre magique : le taux vient de
+                        // l'historique (revenu net d'un jour ÷ TH gagnés le lendemain),
+                        // sinon du champ que l'utilisateur peut régler. Le taux suit le
+                        // prix du GMT : 12,08 $ en juillet, ~10,19 $ fin août. Figé, il
+                        // affichait 0,859 TH pour 1,04 TH réellement gagnés.
+                        const thGained = day.valueBtc * btcRef / upgradeRate() * (1 + TH_BONUS);
                         valueText = '+' + thGained.toFixed(3);
                     }
 
@@ -4438,6 +4458,22 @@ function renderCalendar(history, chartEl) {
         // donc ici le RÉSULTAT du calcul, pas les transactions : quelques nombres,
         // qui suffisent au Portfolio et évitent de refaire défiler des dizaines de
         // pages d'historique chaque jour.
+        // Bonus de réinvestissement en TH, annoncé par GoMining lui-même
+        // (« Get 5% more rewards by converting them into power »).
+        const TH_BONUS = 0.05;
+
+        // Coût d'un TH, par ordre de fiabilité :
+        //   1. déduit de l'historique par l'extension — exact, suit le marché
+        //   2. le champ réglable par l'utilisateur
+        //   3. 12,34, dernier recours
+        function upgradeRate() {
+            const derived = state.upgradeRateUsd;
+            if (derived > 0) return derived;
+            const field = parseFloat(document.getElementById('cost-per-th-upgrade')?.value)
+                       || parseFloat(document.getElementById('reinv-cost-per-th')?.value);
+            return field > 0 ? field : 12.34;
+        }
+
         const CAPITAL_KEY = 'gms_capital';
         const CAPITAL_VERSION = 'v1';
 
@@ -4963,9 +4999,9 @@ function renderCalendar(history, chartEl) {
                 strategy_prices: 'Price Overrides (optional)',
                 strategy_prices_hint: 'Test scenarios — what if BTC pumps or GMT moves? Leave blank to use current snapshot.',
                 strategy_btc_price: 'BTC Price ($)', strategy_gmt_price: 'GMT Price ($)', strategy_cost_per_th: 'Cost per TH ($)',
-                strategy_cost_per_th_hint: '$12.34/TH (confirmed in GoMining app)',
+                strategy_cost_per_th_hint: 'Derived from your history; edit to override',
                 strategy_reinvest_cost: 'Reinvest cost per TH ($)',
-                strategy_reinvest_cost_hint: 'In-app upgrade rate (~$12.34) — used to compute TH gained when reinvesting',
+                strategy_reinvest_cost_hint: 'Upgrade rate, derived from your own history — used to compute TH gained when reinvesting',
                 strategy_market_th_price: 'Market TH price ($)',
                 strategy_market_th_price_hint: 'Live marketplace price (volatile, changes minute-to-minute). Used only for the asset paper-value display. Leave blank to fall back to reinvest cost.',
                 strategy_th_market: 'market',
@@ -5066,7 +5102,7 @@ function renderCalendar(history, chartEl) {
                 lbl_cost_per_th_upg: 'Price per TH/s ($) — Upgrade Existing',
                 lbl_new_efficiency: 'New/Upgrade Efficiency (W/TH)', lbl_lock_duration: 'GMT Lock Duration (years)',
                 lbl_vegmt_apr: 'Estimated veGOMINING APR (%)',
-                hint_cost_per_th_buy: 'Marketplace: $21-26/TH (API confirmed)', hint_cost_per_th_upg: '$12.34/TH (confirmed GoMining app)',
+                hint_cost_per_th_buy: 'Marketplace: $21-26/TH (API confirmed)', hint_cost_per_th_upg: 'Auto-filled from your own history — it follows the GMT price',
                 hint_vegmt_apr: 'Variable — check current rewards',
                 opt_3months: '3 months', opt_6months: '6 months', opt_1year: '1 year', opt_2years: '2 years', opt_4years: '4 years',
                 btn_compare: 'Compare',
@@ -5242,9 +5278,9 @@ function renderCalendar(history, chartEl) {
                 strategy_prices: 'Prix personnalisés (optionnel)',
                 strategy_prices_hint: 'Teste des scénarios — que se passe-t-il si BTC monte ou si GMT bouge ? Laisse vide pour utiliser les prix actuels.',
                 strategy_btc_price: 'Prix BTC ($)', strategy_gmt_price: 'Prix GMT ($)', strategy_cost_per_th: 'Coût par TH ($)',
-                strategy_cost_per_th_hint: '12,34$/TH (confirmé dans l\'app GoMining)',
+                strategy_cost_per_th_hint: 'Déduit de ton historique ; modifie pour forcer une valeur',
                 strategy_reinvest_cost: 'Coût de réinvest par TH ($)',
-                strategy_reinvest_cost_hint: 'Tarif d\'upgrade in-app (~12,34$) — utilisé pour calculer les TH gagnés en réinvestissant',
+                strategy_reinvest_cost_hint: 'Tarif d\'upgrade, déduit de ton historique — sert à calculer les TH gagnés en réinvestissant',
                 strategy_market_th_price: 'Prix marché du TH ($)',
                 strategy_market_th_price_hint: 'Prix marketplace en direct (volatile, change à la minute). Sert uniquement à afficher la valeur papier de l\'actif. Laisse vide pour utiliser le coût de réinvest.',
                 strategy_th_market: 'marché',
@@ -5345,7 +5381,7 @@ function renderCalendar(history, chartEl) {
                 lbl_cost_per_th_upg: 'Prix par TH/s ($) — upgrade existant',
                 lbl_new_efficiency: 'Efficacité du nouveau/upgrade (W/TH)', lbl_lock_duration: 'Durée de lock GMT (années)',
                 lbl_vegmt_apr: 'APR estimé veGOMINING (%)',
-                hint_cost_per_th_buy: 'Marketplace: $21-26/TH (API confirmé)', hint_cost_per_th_upg: '$12.34/TH (confirmé app GoMining)',
+                hint_cost_per_th_buy: 'Marketplace: $21-26/TH (API confirmé)', hint_cost_per_th_upg: 'Déduit de ton historique — il suit le prix du GMT',
                 hint_vegmt_apr: 'Variable — vérifier les rewards actuels',
                 opt_3months: '3 mois', opt_6months: '6 mois', opt_1year: '1 an', opt_2years: '2 ans', opt_4years: '4 ans',
                 btn_compare: 'Comparer',
@@ -6579,6 +6615,7 @@ function renderCalendar(history, chartEl) {
         try { state.lifetimeIncome = JSON.parse(localStorage.getItem('gms_lifetime_income')) || null; } catch (e) {}
         try { state.coverage = JSON.parse(localStorage.getItem('gms_coverage')) || null; } catch (e) {}
         try { state.staking = JSON.parse(localStorage.getItem('gms_staking')) || null; } catch (e) {}
+        try { state.upgradeRateUsd = JSON.parse(localStorage.getItem('gms_upgrade_rate')) || 0; } catch (e) {}
         if (state.rewardHistory.length > 0) {
             document.getElementById('dash-history-section').style.display = 'block';
             showDashboardCalendar(state.rewardHistory);
