@@ -2849,3 +2849,22 @@ a.scan-page::after { content: ' ↗'; font-size: .78em; opacity: .6; }
   line-height: 1.45;
   color: var(--text-dim, #8794a6);
 }
+
+/* Faits veGMT : trois chiffres captés qui n'étaient affichés nulle part. */
+.vegmt-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft, #1b2431);
+  font-size: .78rem;
+}
+.vegmt-facts[hidden] { display: none; }
+.vegmt-facts dt { color: var(--text-dim, #8794a6); }
+.vegmt-facts dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #e7ebf1);
+}

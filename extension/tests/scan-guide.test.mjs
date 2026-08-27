@@ -85,6 +85,13 @@ check(/target\.path\s*\n?\s*\?/.test(HTML) || /target\.path[\s\S]{0,40}\?/.test(
 check(/scan_note_none/.test(HTML), 'un message doit couvrir l’absence d’extension');
 check(/'unknown'|\bunknown\b/.test(HTML), 'un état « inconnu » distinct doit exister');
 
+// 5bis. La page veGMT ne doit toujours pas être liée : son chemin observé
+//       (/lock/ve-my-lock/VIRTUAL_GMT/view/<uuid>) contient l'identifiant de la
+//       position, propre à chaque utilisateur. Le nommer suffit.
+check(!/lock\/ve-my-lock/.test(HTML.replace(/\/\/[^\n]*/g, '')),
+      'le chemin veGMT ne doit apparaître qu’en commentaire, jamais comme lien');
+check(/scan_p_lock: 'Lock/.test(HTML), 'le chemin de navigation veGMT doit être nommé');
+
 // 6. Les chemins liés doivent être ceux réellement observés dans les captures.
 for (const p of ['/nft-miners', '/nft-rewards/solo', '/finance/wallets/virtual/overview/transactions']) {
   check(HTML.includes(p), `le chemin vérifié ${p} doit être présent`);

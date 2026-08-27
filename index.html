@@ -1583,6 +1583,15 @@
                         <input type="number" id="staking-gmt-weekly" value="0" min="0" step="0.1" placeholder="3.68">
                         <span class="hint" data-i18n="hint_staking_weekly">Auto-filled from extension (visit your veGMT lock page)</span>
                     </div>
+                    <!-- Deux données que l'extension captait déjà sans que rien ne
+                         les affiche : la récompense de staking cumulée — du revenu
+                         réel, invisible — et la durée de blocage restante, qui
+                         explique pourquoi ces GMT ne sont pas disponibles. -->
+                    <dl class="vegmt-facts" id="vegmt-facts" hidden>
+                        <dt data-i18n="stk_earned">Earned so far</dt><dd id="vegmt-earned">--</dd>
+                        <dt data-i18n="stk_locked">GMT locked</dt><dd id="vegmt-locked">--</dd>
+                        <dt data-i18n="stk_unlocks">Unlocks in</dt><dd id="vegmt-expires">--</dd>
+                    </dl>
                 </div>
 
                 <div class="port-card port-card--add">
@@ -3580,6 +3589,11 @@
                 if (typeof updateStrategyPriceHints === 'function') updateStrategyPriceHints();
             }
 
+            if (data.staking) {
+                state.staking = data.staking;
+                try { localStorage.setItem('gms_staking', JSON.stringify(data.staking)); } catch (e) {}
+            }
+
             // Auto-fill staking weekly GMT from extension data
             if (data.staking?.weeklyGmtReward) {
                 const stakingEl = document.getElementById('staking-gmt-weekly');
@@ -5127,12 +5141,13 @@ function renderCalendar(history, chartEl) {
                 port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
                 port_bd_no_cats: 'captured before categorisation existed — reload the extension',
                 port_bd_unknown: 'uncategorised movement types seen: {types} — tell us and we will map them',
+                stk_earned: 'Earned so far', stk_locked: 'GMT locked', stk_unlocks: 'Unlocks in',
                 scan_title: 'What to open on GoMining',
                 scan_lead: 'Each page feeds a different part of your data. Open the ones you want unlocked — once each. After that the extension keeps them up to date on its own.',
                 scan_p_miners: 'My miners', scan_u_miners: 'Farm power, miner count, efficiency, discount and balances',
                 scan_p_rewards: 'Rewards', scan_u_rewards: 'Reward history, pool reward and your real daily profit',
                 scan_p_tx: 'Wallet › Transactions', scan_u_tx: 'Invested capital and the spending breakdown — scroll the list once',
-                scan_p_lock: 'veGMT lock page', scan_u_lock: 'Locked GMT and staking rewards',
+                scan_p_lock: 'Lock › My lock › veGMT (no direct link — the URL is unique to your position)', scan_u_lock: 'Locked GMT and staking rewards',
                 scan_p_home: 'GoMining home', scan_u_home: 'Live GMT and BTC prices, and today\'s partial pool reward',
                 scan_note_live: 'Ticked items are already captured. The extension refreshes them whenever you browse GoMining.',
                 scan_note_none: 'No extension detected yet — install it first and this list will show what is captured.',
@@ -5405,12 +5420,13 @@ function renderCalendar(history, chartEl) {
                 port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
                 port_bd_no_cats: 'capturé avant la catégorisation — recharge l\'extension',
                 port_bd_unknown: 'types de mouvement non catégorisés : {types} — signale-le et on les mappera',
+                stk_earned: 'Gagné à ce jour', stk_locked: 'GMT verrouillés', stk_unlocks: 'Déblocage dans',
                 scan_title: 'Quelles pages ouvrir sur GoMining',
                 scan_lead: 'Chaque page alimente une partie différente de tes données. Ouvre celles que tu veux débloquer — une fois chacune. Ensuite l\'extension les tient à jour toute seule.',
                 scan_p_miners: 'My miners', scan_u_miners: 'Puissance de ferme, nombre de mineurs, efficacité, remise et soldes',
                 scan_p_rewards: 'Rewards', scan_u_rewards: 'Historique des récompenses, pool reward et ton vrai profit quotidien',
                 scan_p_tx: 'Wallet › Transactions', scan_u_tx: 'Capital investi et ventilation des dépenses — fais défiler la liste une fois',
-                scan_p_lock: 'Page veGMT lock', scan_u_lock: 'GMT verrouillés et récompenses de staking',
+                scan_p_lock: 'Lock › My lock › veGMT (pas de lien direct — l\'URL est propre à ta position)', scan_u_lock: 'GMT verrouillés et récompenses de staking',
                 scan_p_home: 'Accueil GoMining', scan_u_home: 'Prix GMT et BTC en direct, et le pool reward partiel du jour',
                 scan_note_live: 'Les éléments cochés sont déjà captés. L\'extension les rafraîchit à chaque passage sur GoMining.',
                 scan_note_none: 'Aucune extension détectée — installe-la d\'abord et cette liste montrera ce qui est capté.',
@@ -6096,6 +6112,27 @@ function renderCalendar(history, chartEl) {
             // toujours par diverger.
             document.getElementById('port-asset-value').textContent = formatUSD(assetValue);
 
+            // veGMT : afficher ce qui était capté sans être montré.
+            const stk = state.staking;
+            const vf = document.getElementById('vegmt-facts');
+            if (vf) {
+                const hasStk = !!(stk && (stk.gmtLocked || stk.gmtRewardCumulative));
+                vf.hidden = !hasStk;
+                if (hasStk) {
+                    const earned = stk.gmtRewardCumulative || 0;
+                    document.getElementById('vegmt-earned').textContent =
+                        earned > 0 ? `${earned.toFixed(2)} GMT (${formatUSD(earned * gmtP)})` : '--';
+                    document.getElementById('vegmt-locked').textContent =
+                        stk.gmtLocked ? `${stk.gmtLocked} GMT (${formatUSD(stk.gmtLocked * gmtP)})` : '--';
+                    const dte = stk.daysToExpire || 0;
+                    document.getElementById('vegmt-expires').textContent = dte > 0
+                        ? (dte >= 365
+                            ? `${(dte / 365).toFixed(1)} ${t('years')}`
+                            : `${Math.round(dte)}${t('d_suffix')}`)
+                        : '--';
+                }
+            }
+
             // Breakdown par catégorie
             //
             // Le relevé de transactions fait foi quand il est là : il connaît le
@@ -6251,6 +6288,9 @@ function renderCalendar(history, chartEl) {
               name: 'scan_p_rewards', unlocks: 'scan_u_rewards' },
             { key: 'transactions', path: '/finance/wallets/virtual/overview/transactions',
               name: 'scan_p_tx',      unlocks: 'scan_u_tx' },
+            // Chemin observé : /lock/ve-my-lock/VIRTUAL_GMT/view/<uuid de la position>.
+            // Non liable : l'UUID est propre à chaque utilisateur. On nomme donc le
+            // chemin de navigation, ce qui suffit à s'y rendre.
             { key: 'staking',      path: null,
               name: 'scan_p_lock',    unlocks: 'scan_u_lock' },
             { key: 'homePage',     path: '/',
@@ -6477,6 +6517,7 @@ function renderCalendar(history, chartEl) {
         state.capital = loadCapital();   // survit à la purge 24 h de l'extension
         try { state.lifetimeIncome = JSON.parse(localStorage.getItem('gms_lifetime_income')) || null; } catch (e) {}
         try { state.coverage = JSON.parse(localStorage.getItem('gms_coverage')) || null; } catch (e) {}
+        try { state.staking = JSON.parse(localStorage.getItem('gms_staking')) || null; } catch (e) {}
         if (state.rewardHistory.length > 0) {
             document.getElementById('dash-history-section').style.display = 'block';
             showDashboardCalendar(state.rewardHistory);
