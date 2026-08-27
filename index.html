@@ -3990,9 +3990,21 @@ function renderCalendar(history, chartEl) {
                 );
             }
 
-            if (staleDays >= 2) {
+            // GoMining écrit l'enregistrement d'un jour le LENDEMAIN : le 27, le jour
+            // complet le plus récent possible est le 26. `staleDays = 1` est donc
+            // parfaitement à jour, et `2` signifie qu'il manque UN jour, pas deux.
+            //
+            // On annonce donc la date du dernier jour connu plutôt qu'un compteur
+            // qu'il faut interpréter, et on nomme la page Rewards — l'ancien
+            // message disait « rouvre GoMining », ce que l'utilisateur venait de
+            // faire sans que ça change quoi que ce soit.
+            const missing = Math.max(0, staleDays - 1);
+            if (missing >= 3) {
                 dot.className = 'sync-dot stale';
-                label.textContent = t('sync_stale').replace('{n}', staleDays);
+                label.textContent = t('sync_stale').replace('{d}', lastDay.date);
+            } else if (missing >= 1) {
+                dot.className = 'sync-dot warn';
+                label.textContent = t('sync_behind').replace('{d}', lastDay.date);
             } else if (state.autoSyncActive) {
                 dot.className = 'sync-dot live';
                 label.textContent = t('sync_active');
@@ -5141,7 +5153,8 @@ function renderCalendar(history, chartEl) {
                 reco_then_optimal: 'then switch to the optimal strategy', reco_best_after_reserve: 'Best strategy once reserve is OK',
                 reco_at_current_prices: 'At current prices over',
                 sim_cum_profit: 'Cumulative 12-month profit', sim_optimistic: 'Optimistic', sim_pessimistic: 'Pessimistic', sim_final_th: 'Final TH',
-                sync_active: 'Auto-sync active', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync', sync_none: 'No sync', sync_last: 'Last sync', sync_stale: 'Data {n}d old — reopen GoMining to refresh',
+                sync_active: 'Auto-sync active', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync', sync_none: 'No sync', sync_last: 'Last sync', sync_stale: 'Rewards stop at {d} — open GoMining\'s Rewards page to catch up',
+                sync_behind: 'Rewards up to {d} — one day behind, open the Rewards page',
                 cat_deposit_label: 'Deposit (money in)',
                 cat_deposit: '💵 Deposit (money in)',
                 port_recovered_label: 'Recovered',
@@ -5420,7 +5433,8 @@ function renderCalendar(history, chartEl) {
                 reco_then_optimal: 'ensuite passe à la stratégie optimale', reco_best_after_reserve: 'Meilleure stratégie une fois la réserve OK',
                 reco_at_current_prices: 'Aux prix actuels sur',
                 sim_cum_profit: 'Profit cumulé 12 mois', sim_optimistic: 'Optimiste', sim_pessimistic: 'Pessimiste', sim_final_th: 'TH final',
-                sync_active: 'Auto-sync actif', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync il y a', sync_none: 'Pas de sync', sync_last: 'Dernière sync', sync_stale: 'Données vieilles de {n}j — rouvre GoMining pour rafraîchir',
+                sync_active: 'Auto-sync actif', sync_less_1min: 'Sync < 1 min', sync_ago: 'Sync il y a', sync_none: 'Pas de sync', sync_last: 'Dernière sync', sync_stale: 'Récompenses arrêtées au {d} — ouvre la page Rewards de GoMining',
+                sync_behind: 'Récompenses jusqu\'au {d} — un jour de retard, ouvre la page Rewards',
                 cat_deposit_label: 'Dépôt (argent entrant)',
                 cat_deposit: '💵 Dépôt (argent entrant)',
                 port_recovered_label: 'Récupéré',

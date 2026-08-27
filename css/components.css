@@ -2868,3 +2868,10 @@ a.scan-page::after { content: ' ↗'; font-size: .78em; opacity: .6; }
   font-variant-numeric: tabular-nums;
   color: var(--text, #e7ebf1);
 }
+
+/* Un jour de retard n'est pas une panne : ambre, pas rouge. Le rouge est réservé
+   à trois jours et plus, où quelque chose ne tourne vraiment pas rond. */
+.sync-dot.warn {
+  background: var(--warn, #e0a342);
+  box-shadow: 0 0 6px rgba(224, 163, 66, .55);
+}

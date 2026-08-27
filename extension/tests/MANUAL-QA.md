@@ -19,6 +19,7 @@ node extension/tests/daily-avg.test.mjs
 node extension/tests/portfolio-refresh.test.mjs
 node extension/tests/breakdown-pct.test.mjs
 node extension/tests/scan-guide.test.mjs [chemin-vers-un-export.json]
+node extension/tests/staleness.test.mjs
 ```
 
 Doit afficher `OK`. Ce test relit les regex **dans** `extractor.js` et rejoue
@@ -93,7 +94,9 @@ Sur `gmsim.ca` (ou en local) :
 
 - [ ] la puissance de ferme correspond à ce que GoMining affiche
 - [ ] le calendrier des récompenses est rempli et à jour
-- [ ] la pastille de fraîcheur est verte, pas ambre
+- [ ] la pastille de fraîcheur est verte quand l'historique va jusqu'à HIER
+      (GoMining écrit avec un jour de décalage : « à jour » ne veut pas dire
+      « jusqu'à aujourd'hui »)
 - [ ] le dernier jour du calendrier est **hier**, pas aujourd'hui — GoMining
       écrit l'enregistrement le lendemain du jour miné, et c'est `calculatedAt`
       qui donne le vrai jour
@@ -138,6 +141,7 @@ node extension/tests/daily-avg.test.mjs
 node extension/tests/portfolio-refresh.test.mjs
 node extension/tests/breakdown-pct.test.mjs
 node extension/tests/scan-guide.test.mjs [chemin-vers-un-export.json]
+node extension/tests/staleness.test.mjs
 ```
 
 Le script retire le suffixe `(DEV)` du paquet publié et refuse d'écrire le
