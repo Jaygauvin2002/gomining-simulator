@@ -242,7 +242,7 @@ header { display: none; } /* Replaced by sidebar logo */
 }
 
 .form-group .hint {
-    font-size: 0.75em;
+    font-size: var(--fs-note, 0.75rem);
     color: var(--text-dim);
 }
 

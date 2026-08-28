@@ -65,7 +65,12 @@
     --fs-body:        0.9375rem;     /* 15px — matches body */
     --fs-sm:          0.8125rem;     /* 13px */
     --fs-xs:          0.6875rem;     /* 11px */
-    --fs-2xs:         0.625rem;      /* 10px */
+    --fs-2xs:         0.625rem;      /* 10px — étiquettes capitales espacées */
+    /* Texte explicatif : d'où sort le chiffre, la fraîcheur, la provenance.
+       C'est le contenu le plus important de l'app et il était écrit dans sa
+       plus petite police (10px). Distinct de --fs-2xs, qui reste à 10px pour
+       les étiquettes en capitales où c'est un choix, pas un oubli. */
+    --fs-note:        0.75rem;       /* 12px */
 
     /* Letter-spacing presets */
     --ls-display:     -0.035em;

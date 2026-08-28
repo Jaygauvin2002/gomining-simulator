@@ -2885,3 +2885,13 @@ a.scan-page::after { content: ' ↗'; font-size: .78em; opacity: .6; }
     margin-top: 2px;
     letter-spacing: 0.02em;
 }
+
+/* Les onglets sont devenus focusables (role=tab + tabindex). Sans anneau
+   visible, la navigation clavier est possible mais aveugle — donc inutilisable.
+   :focus-visible seulement : la souris ne doit pas déclencher l'anneau. */
+.nav-item:focus-visible {
+    outline: 2px solid var(--accent-500, #f7931a);
+    outline-offset: -2px;
+    border-radius: 6px;
+}
+.nav-item:focus-visible .nav-icon { transform: none; }
