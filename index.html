@@ -4757,16 +4757,18 @@ function renderCalendar(history, chartEl) {
         // so this banner is now a migration path: it points them at the Chrome
         // Web Store listing, where updates arrive on their own, and it clears
         // itself the moment a 2.4+ build reports in.
-        // ATTENTION AU TIMING. Ce seuil doit passer à '3.5' UNE FOIS que le store
-        // sert bien la 3.5, pas avant : pendant l'examen de Google le store est
-        // encore sur 2.4, et un seuil à 3.5 enverrait les utilisateurs de la 2.4
-        // vers une fiche qui leur propose... la 2.4. Message sans issue.
+        // Ce seuil doit toujours valoir la version que le store SERT RÉELLEMENT,
+        // jamais celle qui est en examen : promettre une version que la fiche ne
+        // propose pas encore envoie l'utilisateur dans un cul-de-sac.
         //
-        // Une fois la 3.5 en ligne, mettre '3.5' : tout ce qui est en dessous est
-        // soit une installation manuelle — le public visé, puisque le
-        // téléchargement direct est retiré — soit une mise à jour automatique qui
-        // n'a pas encore atterri, ce qui se règle en quelques heures.
-        const MIN_EXT_VERSION = '2.4';
+        // 2026-08-28 : la 3.9 est en ligne, donc le seuil passe à 3.9. Tout ce qui
+        // est en dessous est soit une installation manuelle — le public visé,
+        // puisque le téléchargement direct a été retiré — soit une mise à jour
+        // automatique en vol, qui se règle en quelques heures.
+        //
+        // À relever à nouveau quand la 4.6 sera servie, pas quand elle sera
+        // déposée.
+        const MIN_EXT_VERSION = '3.9';
         const EXT_STORE_URL = 'https://chromewebstore.google.com/detail/gmsim-%E2%80%94-miner-sync/llchhkfpkjbkiabpofbpfilicpbnihhp';
         function extVersionOutdated(v) {
             if (!v) return true; // no version reported → pre-2.0 build
