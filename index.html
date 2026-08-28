@@ -1541,6 +1541,11 @@
                     <div class="port-stat port-stat--asset">
                         <div class="port-stat-label" data-i18n="port_asset_value">Replacement Value</div>
                         <div class="port-stat-value" id="port-asset-value" data-i18n-title="port_asset_hint" title="TH valued at the in-app upgrade rate — the cost to rebuild your farm today, not a resale quote. Plus your locked and liquid balances.">--</div>
+                        <!-- La composition, sinon un total qui bouge est illisible : la
+                             valeur a chuté de 17 % le 2026-08-28 parce que le PRIX du TH
+                             était passé de 12,34 à 10,18 $, pas parce que la ferme avait
+                             perdu quoi que ce soit. -->
+                        <div class="port-stat-sub" id="port-asset-sub"></div>
                     </div>
                 </div>
             </div>
@@ -5235,6 +5240,7 @@ function renderCalendar(history, chartEl) {
                 port_bd_manual: 'From your manual entries. Visit your GoMining transaction history to have this filled in automatically.',
                 port_bd_no_cats: 'captured before categorisation existed — reload the extension',
                 port_bd_unknown: 'uncategorised movement types seen: {types} — tell us and we will map them',
+                port_asset_balances: 'in balances',
                 stk_earned: 'Earned so far', stk_locked: 'GMT locked', stk_unlocks: 'Unlocks in',
                 scan_title: 'What to open on GoMining',
                 scan_lead: 'Each page feeds a different part of your data. Open the ones you want unlocked — once each. After that the extension keeps them up to date on its own.',
@@ -5515,6 +5521,7 @@ function renderCalendar(history, chartEl) {
                 port_bd_manual: 'D\'après tes saisies manuelles. Passe sur ton historique de transactions GoMining pour que ce soit rempli automatiquement.',
                 port_bd_no_cats: 'capturé avant la catégorisation — recharge l\'extension',
                 port_bd_unknown: 'types de mouvement non catégorisés : {types} — signale-le et on les mappera',
+                port_asset_balances: 'en soldes',
                 stk_earned: 'Gagné à ce jour', stk_locked: 'GMT verrouillés', stk_unlocks: 'Déblocage dans',
                 scan_title: 'Quelles pages ouvrir sur GoMining',
                 scan_lead: 'Chaque page alimente une partie différente de tes données. Ouvre celles que tu veux débloquer — une fois chacune. Ensuite l\'extension les tient à jour toute seule.',
@@ -6206,6 +6213,18 @@ function renderCalendar(history, chartEl) {
             // recalcule pas : deux formules pour un même chiffre finissent
             // toujours par diverger.
             document.getElementById('port-asset-value').textContent = formatUSD(assetValue);
+            const assetSub = document.getElementById('port-asset-sub');
+            if (assetSub) {
+                // Dire de quoi le total est fait, et à quel prix le TH est valorisé.
+                // Un utilisateur qui voit son actif baisser doit pouvoir constater
+                // que ce sont ses TH qui n'ont pas bougé et le prix qui a changé.
+                const parts = [];
+                if (thNow > 0) parts.push(`${thNow.toFixed(2)} TH × ${formatUSD(thCost)}`);
+                const bal = (lockedGmt + liquidGmt) * gmtP + liquidBtc * (state.btcPrice || 0);
+                if (bal > 0.01) parts.push(`+ ${formatUSD(bal)} ${t('port_asset_balances')}`);
+                assetSub.textContent = parts.join(' ');
+                assetSub.style.display = parts.length ? '' : 'none';
+            }
 
             // veGMT : afficher ce qui était capté sans être montré.
             const stk = state.staking;

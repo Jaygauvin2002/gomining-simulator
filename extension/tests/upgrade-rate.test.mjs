@@ -145,6 +145,25 @@ check(/const observed = observedThGain\(day\.date\)/.test(HTML),
 check(/valueText = '~'/.test(HTML),
       'une valeur estimée doit être marquée d’un tilde, pas présentée comme mesurée');
 
+// 6ter. La valeur de remplacement doit afficher SA COMPOSITION.
+//
+//       Le 2026-08-28 elle est passée de 8 939 $ à 7 434 $ : −17 %, uniquement
+//       parce que le prix du TH était tombé de 12,34 à 10,18 $. Les TH étaient
+//       inchangés. Un total qui bouge sans dire de quoi il est fait se lit comme
+//       une perte.
+check(/port-asset-sub/.test(HTML), 'la carte doit avoir une sous-ligne de composition');
+check(/thNow\.toFixed\(2\)\} TH × \$\{formatUSD\(thCost\)/.test(HTML),
+      'la sous-ligne doit montrer les TH ET le prix unitaire utilisé');
+{
+  // Rejeu : à TH constants, seul le prix explique l'écart.
+  const th = 696.8184, bal = 340;
+  const v = (cost) => th * cost + bal;
+  check(Math.abs(v(12.34) - 8938.74) < 1, `12,34 $ → 8 939 $ (obtenu ${v(12.34).toFixed(0)})`);
+  check(Math.abs(v(10.18) - 7433.61) < 1, `10,18 $ → 7 434 $ (obtenu ${v(10.18).toFixed(0)})`);
+  check(Math.abs((v(10.18) / v(12.34) - 1) * 100 + 16.8) < 0.5,
+        'l’écart de −17 % s’explique entièrement par le prix');
+}
+
 // 7. Sur le vrai relevé : ~12,08 $, la valeur observée en juillet.
 const real = process.argv[2];
 if (real && existsSync(real)) {
