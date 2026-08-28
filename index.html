@@ -5257,9 +5257,9 @@ function renderCalendar(history, chartEl) {
                 guide_ns2: 'Open <strong>app.gomining.com</strong> and sign in — the extension icon appears bottom-right',
                 guide_ns3: 'Visit your <strong>Rewards</strong> page once, then come back here. Everything syncs on its own from then on.',
                 guide_store_note: 'Installing from the store means the extension updates itself — no reloading by hand, ever.',
-                hist_uptodate: 'Up to date', hist_recent: 'Last solo sync', hist_days_ago: ' days ago',
-                hist_behind_pre: 'Solo history', hist_behind_post: 'd behind',
+                hist_uptodate: 'Up to date',
                 hist_behind_hint: 'Open GoMining\u2019s Rewards page to refresh — or, if you earn through Miner Wars, GMSim does not compute those rewards yet.',
+                hist_missing_pre: 'Missing', hist_missing_post: ' day(s)',
                 wb_lead: 'Since your last visit', wb_days: 'd', wb_strategy: 'Optimal strategy',
                 alerts_label: 'Alerts', alerts_optin: 'Email me when my optimal strategy changes',
                 alerts_note: 'Off by default. No other email is ever sent, and you can turn this off here at any time.',
@@ -5537,9 +5537,9 @@ function renderCalendar(history, chartEl) {
                 guide_ns2: 'Ouvre <strong>app.gomining.com</strong> et connecte-toi — l\'icône apparaît en bas à droite',
                 guide_ns3: 'Passe une fois sur ta page <strong>Rewards</strong>, puis reviens ici. Tout se synchronise ensuite tout seul.',
                 guide_store_note: 'Installée depuis le store, l\'extension se met à jour toute seule — plus jamais de rechargement à la main.',
-                hist_uptodate: 'À jour', hist_recent: 'Dernière sync solo', hist_days_ago: ' jours',
-                hist_behind_pre: 'Historique solo', hist_behind_post: 'j de retard',
+                hist_uptodate: 'À jour',
                 hist_behind_hint: 'Ouvre la page Rewards de GoMining pour rafraîchir — ou, si tes gains passent par Miner Wars, GMSim ne calcule pas encore ces revenus.',
+                hist_missing_pre: 'Manque', hist_missing_post: ' jour(s)',
                 wb_lead: 'Depuis ta dernière visite', wb_days: 'j', wb_strategy: 'Stratégie optimale',
                 alerts_label: 'Alertes', alerts_optin: 'Préviens-moi par courriel quand ma stratégie optimale change',
                 alerts_note: 'Désactivé par défaut. Aucun autre courriel n\u2019est envoyé, et tu peux le couper ici quand tu veux.',
@@ -7170,15 +7170,25 @@ function renderCalendar(history, chartEl) {
                     ));
                     // Un historique solo figé n'est pas forcément une panne : les
                     // joueurs Miner Wars gagnent par un autre canal, que GMSim ne
-                    // calcule pas encore. Dire « re-sync needed » leur faisait
-                    // croire que l'outil était cassé.
+                    // calcule pas encore.
+                    //
+                    // Et GoMining écrit l'enregistrement d'un jour LE LENDEMAIN :
+                    // un écart d'un jour est donc parfaitement à jour, et deux
+                    // signifie qu'il en manque UN. Cette pastille annonçait
+                    // « 2 days ago » quand la pastille de synchro, corrigée, disait
+                    // « un jour de retard » — deux indicateurs, deux vérités.
+                    // Elles partagent maintenant la même arithmétique.
+                    const missing = Math.max(0, days - 1);
                     const tt = (k, fb) => (typeof t === 'function' ? (t(k) || fb) : fb);
                     let label, klass, hint = '';
-                    if (days <= 1)      { label = tt('hist_uptodate','Up to date') + ' · ' + latest; klass = 'fresh'; }
-                    else if (days <= 3) { label = tt('hist_recent','Last solo sync') + ': ' + days + tt('hist_days_ago',' days ago'); klass = 'warn'; }
-                    else {
-                        label = '⚠ ' + tt('hist_behind_pre','Solo history') + ' ' + days + tt('hist_behind_post','d behind');
+                    if (missing === 0) { label = tt('hist_uptodate','Up to date') + ' · ' + latest; klass = 'fresh'; }
+                    else if (missing <= 2) {
+                        label = tt('hist_missing_pre','Missing') + ' ' + missing + tt('hist_missing_post',' day(s)') + ' · ' + latest;
                         klass = 'warn';
+                        hint  = tt('hist_behind_hint','Open GoMining\u2019s Rewards page to refresh — or, if you earn through Miner Wars, GMSim does not compute those rewards yet.');
+                    } else {
+                        label = '⚠ ' + tt('hist_missing_pre','Missing') + ' ' + missing + tt('hist_missing_post',' day(s)') + ' · ' + latest;
+                        klass = 'stale';
                         hint  = tt('hist_behind_hint','Open GoMining\u2019s Rewards page to refresh — or, if you earn through Miner Wars, GMSim does not compute those rewards yet.');
                     }
                     stalePill.textContent = label;

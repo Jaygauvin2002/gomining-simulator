@@ -58,6 +58,22 @@ check(grade(3) === 'warn', 'trois jours → ambre');
 check(grade(4) === 'stale', 'quatre jours = trois manquants → rouge');
 check(grade(30) === 'stale', 'un mois → rouge');
 
+// 5bis. Les DEUX indicateurs doivent partager la même arithmétique.
+//
+//       La pastille du calendrier annonçait « Last solo sync: 2 days ago » quand
+//       la pastille de synchro, corrigée, disait « un jour de retard ». Deux
+//       indicateurs côte à côte, deux vérités — celui qui les lit ne peut que
+//       douter des deux.
+{
+  const occurrences = (HTML.match(/Math\.max\(0, (?:staleDays|days) - 1\)/g) || []).length;
+  check(occurrences >= 2,
+        `le décalage d'un jour doit être retiré dans les DEUX indicateurs (trouvé ${occurrences})`);
+  check(/hist_missing_pre/.test(HTML),
+        'la pastille du calendrier doit annoncer les jours MANQUANTS, pas l’ancienneté brute');
+  check(!/hist_recent/.test(HTML.replace(/\/\/[^\n]*/g, '')),
+        'l’ancien libellé « Last solo sync: N days ago » ne doit plus être utilisé');
+}
+
 // 6. Le style du palier ambre doit exister, sinon la pastille est invisible.
 const CSS = readFileSync(join(here, '..', '..', 'css', 'components.css'), 'utf8');
 check(/\.sync-dot\.warn/.test(CSS), 'la classe .sync-dot.warn doit être stylée');
