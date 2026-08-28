@@ -225,6 +225,20 @@ check(effDailyElecCost(100, 15, 0.05, 0) > 0, 'coût électrique positif sur des
 }
 check(near(effDailyElecCost(100, 15, 0.05, 100), 0), 'remise de 100 % → coût nul, pas négatif');
 
+// --- 11. Le tableau doit déclarer l'alignement des DEUX côtés -----------
+// main.css pose `th, td { text-align: right }` pour toute l'app. Ne styler que
+// les th donne une spécificité plus forte sur les en-têtes tout en laissant les
+// td suivre la règle globale : les colonnes se décalent visiblement. Ce contrôle
+// existe parce que le bug est passé en production et n'était visible qu'à l'œil.
+{
+  const css = readFileSync(join(here, '..', '..', 'css', 'efficiency-calc.css'), 'utf8');
+  const align = css.match(/\.eff-ladder[^{]*\{[^}]*text-align[^}]*\}/g) || [];
+  const blob = align.join(' ');
+  check(/\.eff-ladder\s+thead\s+th/.test(blob), 'l\'alignement couvre les en-têtes');
+  check(/\.eff-ladder\s+tbody\s+td/.test(blob), 'l\'alignement couvre AUSSI les cellules');
+  check(/first-child/.test(blob), 'et la première colonne est traitée à part');
+}
+
 console.log(fails.length
   ? `  ÉCHEC — ${pass} ok, ${fails.length} échec(s)\n` + fails.map(f => '    · ' + f).join('\n')
   : `  OK — ${pass} vérifications du calculateur d'efficacité`);

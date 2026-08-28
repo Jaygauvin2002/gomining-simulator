@@ -403,6 +403,17 @@ function runStrategySimulation() {
         if (!dayR) break;
 
         let dayBtc = 0, dayGmt = 0, dayTh = 0;
+
+        // Protection de déficit : GoMining ferme la ferme le jour où elle serait
+        // négative, et ARRÊTE TOUS LES FRAIS. Un tel jour ne contribue donc rien
+        // du tout — ni brut, ni frais, ni TH réinvesti. Avant, la projection
+        // composait une perte qui n'arrive jamais, ce qui rendait pessimiste
+        // exactement le plan qu'on demande à l'outil d'évaluer.
+        if (dayR.paused) {
+            dayLog.push({ day: i + 1, strat, power, btc: 0, gmt: 0, th: 0, feesGmt: 0, paused: true });
+            continue;
+        }
+
         const dayFeesGmt = dayR.feesGmt;
         const dayFeesUsd = dayFeesGmt * gmtPrice;
 

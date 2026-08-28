@@ -66,7 +66,7 @@
     <link rel="stylesheet" href="css/tokens.css?v=20260505a">
     <link rel="stylesheet" href="css/components.css?v=20260505a">
     <link rel="stylesheet" href="css/strategy-lab.css?v=20260504a">
-    <link rel="stylesheet" href="css/efficiency-calc.css?v=20260828a">
+    <link rel="stylesheet" href="css/efficiency-calc.css?v=20260828b">
 </head>
 <body>
     <!-- Animated background brand logos — BTC (orange) and GMT (purple)
@@ -1796,7 +1796,7 @@
          getLastCompleteRewardDay) that are defined in the inline script —
          that's fine, they only execute when called. -->
     <script src="js/strategy-lab.js?v=20260504a"></script>
-    <script src="js/efficiency-calc.js?v=20260828a"></script>
+    <script src="js/efficiency-calc.js?v=20260828b"></script>
 
     <script>
         // ===== STATE =====
@@ -2165,6 +2165,20 @@
             // GMT qui est réduit (28,7417 au lieu de 29,4033).
             const netGmtCredited = totalNetGmt * (1 - commission);
 
+            // Protection de déficit. GoMining évalue la ferme UNE FOIS PAR JOUR,
+            // au moment du paiement, et la ferme si elle est négative — tous
+            // frais arrêtés. Le résultat réel d'une journée est donc max(0, net),
+            // et une ferme au-delà de son seuil ne perd rien : elle ne gagne rien.
+            //
+            // On EXPOSE les deux plutôt que de borner en place. Les champs net*
+            // gardent leur signe, dont dépendent la recherche du prix BTC de
+            // seuil et le calcul du seuil d'efficacité — les borner casserait
+            // les deux. Les champs *Paid disent ce qui est réellement crédité,
+            // et `paused` dit dans quel régime on est. Chaque affichage choisit :
+            // le montant payé est la vérité, le montant théorique dit de combien
+            // on est sous l'eau, donc quelle remontée du BTC remet en route.
+            const paused = totalNetGmt <= 0;
+
             return {
                 grossBtc,
                 grossUsd: totalPrGmt * gmtPrice,
@@ -2176,6 +2190,11 @@
                 netUsd: totalNetGmt * gmtPrice,
                 netGmt: netGmtCredited,
                 netGmtBeforeCommission: totalNetGmt,
+                paused,
+                netBtcPaid: paused ? 0 : netBtc,
+                netUsdPaid: paused ? 0 : totalNetGmt * gmtPrice,
+                netGmtPaid: paused ? 0 : netGmtCredited,
+                grossBtcPaid: paused ? 0 : grossBtc,
                 // Per TH details (sats)
                 prSat: satPerTH,
                 c1Sat: Math.round(c1GmtPerTH * gmtPrice / btcPrice * 1e8),
@@ -2216,16 +2235,23 @@
             document.getElementById('res-fees-btc').textContent = '-' + formatVal(r.feesBtc, bp, r.feesGmt);
             document.getElementById('res-fees-usd').textContent = `C1: ${r.c1Sat} sat + C2: ${r.c2Sat} sat /TH`;
 
+            // Ce qui est RÉELLEMENT crédité : zéro quand la protection de déficit
+            // met la ferme en pause. Le montant théorique reste affiché juste en
+            // dessous — il dit de combien la ferme est sous l'eau, et c'est
+            // l'information qui permet de savoir quelle remontée du BTC la
+            // remettrait en route. La jeter appauvrirait l'écran.
             const netEl = document.getElementById('res-net-btc');
-            netEl.textContent = formatProfit(r.netBtc, bp, r.netGmt, r.grossBtc);
-            netEl.className = 'big ' + (r.netGmt >= 0 ? 'positive' : 'negative');
-            document.getElementById('res-net-usd').textContent = `${r.rewardSat} sat/TH/jour (net)`;
+            netEl.textContent = formatProfit(r.netBtcPaid, bp, r.netGmtPaid, r.grossBtcPaid);
+            netEl.className = 'big ' + (r.paused ? 'negative' : 'positive');
+            document.getElementById('res-net-usd').textContent = r.paused
+                ? `${t('paused_farm', 'Farm paused — GoMining stops all fees')} · ${t('paused_would_be', 'would be')} ${formatUSD(r.netUsd)}/${t('eff_day', 'day')}`
+                : `${r.rewardSat} sat/TH/jour (net)`;
 
-            document.getElementById('res-month-btc').textContent = formatProfit(r.netBtc * 30, bp, r.netGmt * 30, r.grossBtc * 30);
-            document.getElementById('res-month-usd').textContent = '';
+            document.getElementById('res-month-btc').textContent = formatProfit(r.netBtcPaid * 30, bp, r.netGmtPaid * 30, r.grossBtcPaid * 30);
+            document.getElementById('res-month-usd').textContent = r.paused ? t('paused_short', 'paused') : '';
 
-            document.getElementById('res-year-btc').textContent = formatProfit(r.netBtc * 365, bp, r.netGmt * 365, r.grossBtc * 365);
-            document.getElementById('res-year-usd').textContent = '';
+            document.getElementById('res-year-btc').textContent = formatProfit(r.netBtcPaid * 365, bp, r.netGmtPaid * 365, r.grossBtcPaid * 365);
+            document.getElementById('res-year-usd').textContent = r.paused ? t('paused_short', 'paused') : '';
 
             // === INFO MINEUR ===
             const currentLevel = getCurrentLevel(hashrate);
@@ -2378,15 +2404,20 @@
                 priceEl.textContent = formatUSD(price);
                 const r = calcDailyReward(c.hashrate, c.efficiency, c.elecCost, c.discount, price, c.satPerTH);
                 if (!r) return;
-                netEl.textContent = formatUSD(r.netUsd) + '/day';
-                netEl.className = 'scn-hero-net ' + (r.netUsd >= 0 ? 'pos' : 'neg');
+                // Un scénario de chute annonçait « −4 $/jour, −1 460 $/an ». Faux :
+                // la ferme serait simplement en pause à zéro. On montre le montant
+                // payé, et le théorique à côté pour dire l'ampleur du déficit.
+                netEl.textContent = formatUSD(r.netUsdPaid) + '/day';
+                netEl.className = 'scn-hero-net ' + (r.paused ? 'neg' : 'pos');
                 let deltaTxt = '';
-                if (id !== 'current' && currentDailyNet && currentDailyNet.netUsd) {
-                    const pct = ((r.netUsd - currentDailyNet.netUsd) / Math.abs(currentDailyNet.netUsd)) * 100;
+                if (id !== 'current' && currentDailyNet && currentDailyNet.netUsdPaid) {
+                    const pct = ((r.netUsdPaid - currentDailyNet.netUsdPaid) / Math.abs(currentDailyNet.netUsdPaid)) * 100;
                     const sign = pct >= 0 ? '+' : '';
                     deltaTxt = ` · ${sign}${pct.toFixed(0)}% vs now`;
                 }
-                metaEl.textContent = formatUSD(r.netUsd * 365) + '/year' + deltaTxt;
+                metaEl.textContent = r.paused
+                    ? `${t('paused_short', 'paused')} · ${t('paused_would_be', 'would be')} ${formatUSD(r.netUsd)}/${t('eff_day', 'day')}`
+                    : formatUSD(r.netUsdPaid * 365) + '/year' + deltaTxt;
             });
 
             // === Render scenario cards ===
@@ -2402,19 +2433,20 @@
                     const cls = ['scn-card'];
                     if (isCurrent) cls.push('scn-card--current');
                     if (isCustom) cls.push('scn-card--custom');
-                    const netClass = r.netUsd >= 0 ? 'pos' : 'neg';
+                    const netClass = r.paused ? 'neg' : 'pos';
                     const card = document.createElement('div');
                     card.className = cls.join(' ');
                     card.innerHTML = `
                         ${isCurrent ? '<span class="scn-card-pill">' + (t('scn_now') || 'Now') + '</span>' : ''}
                         ${isCustom && !isCurrent ? '<button class="scn-card-x" title="Remove" onclick="removeScenarioChip(' + btcP + ')">×</button>' : ''}
                         <div class="scn-card-price">${formatUSD(btcP)}</div>
-                        <div class="scn-card-net ${netClass}">${formatUSD(r.netUsd)}<span class="scn-card-net-unit">/day</span></div>
+                        <div class="scn-card-net ${netClass}">${formatUSD(r.netUsdPaid)}<span class="scn-card-net-unit">/day</span></div>
+                        ${r.paused ? '<div class="scn-card-paused">' + t('paused_short', 'paused') + ' · ' + t('paused_would_be', 'would be') + ' ' + formatUSD(r.netUsd) + '</div>' : ''}
                         <div class="scn-card-stats">
-                            <div><span>Net/mo</span><strong class="${netClass}">${formatUSD(r.netUsd * 30)}</strong></div>
-                            <div><span>Net/yr</span><strong class="${netClass}">${formatUSD(r.netUsd * 365)}</strong></div>
-                            <div><span>Gross/d</span><strong>${formatUSD(r.grossUsd)}</strong></div>
-                            <div><span>Fees/d</span><strong class="neg">-${formatUSD(r.feesUsd)}</strong></div>
+                            <div><span>Net/mo</span><strong class="${netClass}">${formatUSD(r.netUsdPaid * 30)}</strong></div>
+                            <div><span>Net/yr</span><strong class="${netClass}">${formatUSD(r.netUsdPaid * 365)}</strong></div>
+                            <div><span>Gross/d</span><strong>${r.paused ? formatUSD(0) : formatUSD(r.grossUsd)}</strong></div>
+                            <div><span>Fees/d</span><strong class="neg">${r.paused ? formatUSD(0) : '-' + formatUSD(r.feesUsd)}</strong></div>
                         </div>
                     `;
                     grid.appendChild(card);
@@ -5106,6 +5138,9 @@ function renderCalendar(history, chartEl) {
                 nav_reinvest: 'Reinvestment', nav_compare: 'Compare', nav_simulation: 'Simulation',
                 nav_performance: 'Performance', nav_alerts: 'Alerts', nav_portfolio: 'Portfolio',
                 nav_efficiency: 'Efficiency',
+                paused_farm: 'Farm paused — GoMining stops all fees',
+                paused_would_be: 'would be',
+                paused_short: 'paused',
                 eff_k_restored: 'Income restored',
                 eff_k_restored_sub: 'farm currently paused — earns nothing today',
                 eff_n_6: '<strong>A paused farm changes the maths.</strong> GoMining pauses a farm that would mine at a loss, so above a certain W/TH it earns nothing instead of losing money — and pays no electricity while paused. For such a farm the upgrade does not cut a bill, it restores income, and the figures above only apply once it is running again.',
@@ -5430,6 +5465,9 @@ function renderCalendar(history, chartEl) {
                 nav_reinvest: 'Réinvestissement', nav_compare: 'Comparer', nav_simulation: 'Simulation',
                 nav_performance: 'Performance', nav_alerts: 'Alertes', nav_portfolio: 'Portfolio',
                 nav_efficiency: 'Efficacité',
+                paused_farm: 'Ferme en pause — GoMining arrête tous les frais',
+                paused_would_be: 'serait de',
+                paused_short: 'en pause',
                 eff_k_restored: 'Revenu restauré',
                 eff_k_restored_sub: 'ferme en pause — elle ne gagne rien aujourd\'hui',
                 eff_n_6: '<strong>Une ferme en pause change le calcul.</strong> GoMining met en pause une ferme qui minerait à perte : au-delà d\'un certain W/TH elle ne gagne rien au lieu de perdre — et ne paie pas d\'électricité pendant l\'arrêt. Pour une telle ferme, l\'upgrade ne réduit pas une facture, il restaure un revenu, et les chiffres ci-dessus ne s\'appliquent qu\'une fois qu\'elle tourne.',

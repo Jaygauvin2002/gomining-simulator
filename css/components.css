@@ -2876,3 +2876,12 @@ a.scan-page::after { content: ' ↗'; font-size: .78em; opacity: .6; }
   background: var(--warn, #e0a342);
   box-shadow: 0 0 6px rgba(224, 163, 66, .55);
 }
+
+/* Protection de déficit : une ferme en pause gagne zéro, elle ne perd pas.
+   La mention porte le montant théorique, qui dit de combien on est sous l'eau. */
+.scn-card-paused {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 0.02em;
+}

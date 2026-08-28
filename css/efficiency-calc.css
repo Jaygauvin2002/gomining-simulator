@@ -106,8 +106,18 @@
     width: 100%; border-collapse: collapse; font-size: var(--fs-sm, .88rem);
     font-variant-numeric: tabular-nums; min-width: 620px;
 }
+/* main.css déclare `th, td { text-align: right }` pour toute l'app, avec la
+   première colonne à gauche. Il faut donc déclarer les DEUX ici : ne styler que
+   les th laissait les td suivre la règle globale, et les colonnes se
+   décalaient. Les chiffres restent à droite — c'est le bon alignement pour des
+   nombres tabulaires, et c'est la convention du reste de l'app. */
+.eff-ladder thead th,
+.eff-ladder tbody td { text-align: right; }
+.eff-ladder thead th:first-child,
+.eff-ladder tbody td:first-child { text-align: left; }
+
 .eff-ladder thead th {
-    text-align: left; padding: 9px 12px; font-size: var(--fs-2xs, .66rem);
+    padding: 9px 12px; font-size: var(--fs-2xs, .66rem);
     letter-spacing: var(--ls-wide, .06em); text-transform: uppercase;
     color: var(--text-dim); border-bottom: 1px solid var(--border-strong); font-weight: 600;
 }
