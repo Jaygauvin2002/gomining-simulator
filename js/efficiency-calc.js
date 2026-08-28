@@ -85,14 +85,37 @@ function effDailyElecCost(th, wth, elecRateKwh, discountPct) {
 }
 
 // Le calcul complet d'un upgrade. Tout est dérivé, rien n'est supposé.
-function effEvaluate({ th, fromWth, toWth, elecRateKwh, discountPct }) {
+//
+// `netPerThFn` est optionnel : une fonction W/TH → profit net USD par TH et par
+// jour. Fournie, elle remplace le simple écart d'électricité par le vrai gain
+// sous protection de déficit — GoMining évalue une fois par jour au moment du
+// paiement et ferme la ferme si elle est négative, tous frais arrêtés. Le
+// résultat d'une journée est donc max(0, net), et l'upgrade d'une ferme en
+// pause ne réduit pas une facture : il restaure un revenu entier.
+//
+// Ce n'est pas une branche parallèle mais une généralisation : quand les deux
+// états sont rentables, net = PR − C1(w) − C2, donc net(cible) − net(actuel)
+// vaut exactement C1(actuel) − C1(cible), soit l'écart d'électricité. Même
+// réponse dans le cas normal, bonne réponse dans le cas en pause.
+function effEvaluate({ th, fromWth, toWth, elecRateKwh, discountPct, netPerThFn }) {
     const costPerTh = effCostPerTh(fromWth, toWth);
     if (costPerTh === null) return null;
 
-    const totalCost   = costPerTh * (Number(th) || 0);
+    const thNum       = Number(th) || 0;
+    const totalCost   = costPerTh * thNum;
     const dailyBefore = effDailyElecCost(th, fromWth, elecRateKwh, discountPct);
     const dailyAfter  = effDailyElecCost(th, toWth,   elecRateKwh, discountPct);
-    const dailySaving = dailyBefore - dailyAfter;
+
+    let dailySaving = dailyBefore - dailyAfter;
+    let paused = false;
+    if (typeof netPerThFn === 'function') {
+        const nFrom = netPerThFn(Math.round(Number(fromWth)));
+        const nTo   = netPerThFn(Math.round(Number(toWth)));
+        if (isFinite(nFrom) && isFinite(nTo)) {
+            dailySaving = (Math.max(0, nTo) - Math.max(0, nFrom)) * thNum;
+            paused = nFrom <= 0;
+        }
+    }
     const yearSaving  = dailySaving * DAYS_PER_YEAR;
 
     // La remise réduit l'économie SANS réduire le prix de l'upgrade
@@ -100,6 +123,9 @@ function effEvaluate({ th, fromWth, toWth, elecRateKwh, discountPct }) {
     // allonge donc le retour, contre-intuitivement.
     return {
         costPerTh, totalCost, dailyBefore, dailyAfter, dailySaving, yearSaving,
+        // true = la ferme est en pause au W/TH de départ, donc l'écart
+        // d'électricité affiché ne s'applique qu'après le redémarrage.
+        paused,
         // Le retour ne dépend pas de la taille de la ferme : coût et
         // économie montent tous deux par TH. On ne peut pas « essayer petit ».
         paybackYears: dailySaving > 0 ? totalCost / yearSaving : null,
@@ -111,7 +137,7 @@ function effEvaluate({ th, fromWth, toWth, elecRateKwh, discountPct }) {
 // Les paliers traversés en descendant, un segment par bande de prix.
 // C'est la vue « où s'arrêter » : on descend tant que le rendement
 // marginal du segment reste bon, on s'arrête quand il tombe.
-function effLadder({ th, fromWth, elecRateKwh, discountPct, floor = EFF_FLOOR }) {
+function effLadder({ th, fromWth, elecRateKwh, discountPct, netPerThFn, floor = EFF_FLOOR }) {
     const start = Math.round(Number(fromWth));
     if (!isFinite(start) || start <= floor) return [];
     const rows = [];
@@ -123,7 +149,7 @@ function effLadder({ th, fromWth, elecRateKwh, discountPct, floor = EFF_FLOOR })
         // Descendre tant que le prix du palier ne change pas.
         let end = w;
         while (end > floor && effStepPrice(end) === price) end--;
-        const seg = effEvaluate({ th, fromWth: w, toWth: end, elecRateKwh, discountPct });
+        const seg = effEvaluate({ th, fromWth: w, toWth: end, elecRateKwh, discountPct, netPerThFn });
         if (!seg) break;
         rows.push({ fromWth: w, toWth: end, stepPrice: price, steps: w - end, ...seg });
         w = end;
@@ -224,6 +250,18 @@ function effBreakevenWth() {
     return best;   // null = déficitaire même à 12 W/TH : le problème est ailleurs
 }
 
+// Profit net USD par TH et par jour, à un W/TH donné. Retourne null si l'app
+// n'est pas chargée — auquel cas le calculateur retombe sur l'écart
+// d'électricité, qui reste juste tant que la ferme tourne.
+function effNetPerThFn() {
+    const f = effFarmInputs();
+    if (!f) return null;
+    return function (w) {
+        const r = calcDailyReward(1, w, f.elec, f.disc, f.btcPrice, f.satPerTH);
+        return (r && isFinite(r.netUsd)) ? r.netUsd : NaN;
+    };
+}
+
 // → { pct, status } avec status 'ok' | 'unprofitable' | 'unknown'.
 // Rendement annuel d'un dollar mis en hashrate plutôt qu'en watts. C'est la
 // seule comparaison honnête : les deux dépenses sortent de la même poche.
@@ -272,8 +310,9 @@ function updateEfficiencyCalc() {
     const hr     = effHashrateReturn();
     const hrRet  = hr.pct;
 
+    const netPerThFn = effNetPerThFn();
     const out = document.getElementById('eff-result');
-    const r = effEvaluate({ th, fromWth: from, toWth: to, elecRateKwh: elec, discountPct: disc });
+    const r = effEvaluate({ th, fromWth: from, toWth: to, elecRateKwh: elec, discountPct: disc, netPerThFn });
 
     if (out) {
         if (!r || r.wattsSaved <= 0) {
@@ -296,9 +335,13 @@ function updateEfficiencyCalc() {
                   <span class="eff-kpi-sub">${th.toLocaleString()} TH × ${formatUSD(r.costPerTh)}/TH</span>
                 </div>
                 <div class="eff-kpi">
-                  <span class="eff-kpi-label">${t('eff_k_saving', 'Electricity saved')}</span>
+                  <span class="eff-kpi-label">${r.paused
+                      ? t('eff_k_restored', 'Income restored')
+                      : t('eff_k_saving', 'Electricity saved')}</span>
                   <span class="eff-kpi-value eff-pos">${formatUSD(r.dailySaving)}<span class="eff-kpi-unit">/${t('eff_day', 'day')}</span></span>
-                  <span class="eff-kpi-sub">${formatUSD(r.dailyBefore)} → ${formatUSD(r.dailyAfter)} · ${formatUSD(r.yearSaving)}/${t('eff_year', 'yr')}</span>
+                  <span class="eff-kpi-sub">${r.paused
+                      ? t('eff_k_restored_sub', 'farm currently paused — earns nothing today')
+                      : formatUSD(r.dailyBefore) + ' → ' + formatUSD(r.dailyAfter)} · ${formatUSD(r.yearSaving)}/${t('eff_year', 'yr')}</span>
                 </div>
                 <div class="eff-kpi">
                   <span class="eff-kpi-label">${t('eff_k_payback', 'Payback')}</span>
@@ -345,7 +388,7 @@ function updateEfficiencyCalc() {
     // L'échelle : où s'arrêter.
     const ladderBody = document.getElementById('eff-ladder-body');
     if (ladderBody) {
-        const rows = effLadder({ th, fromWth: from, elecRateKwh: elec, discountPct: disc });
+        const rows = effLadder({ th, fromWth: from, elecRateKwh: elec, discountPct: disc, netPerThFn });
         if (!rows.length) {
             ladderBody.innerHTML = `<tr><td colspan="5" class="eff-empty">${
                 t('eff_at_floor', 'You are at 12 W/TH — the floor. There is nothing left to upgrade.')

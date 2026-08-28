@@ -135,6 +135,57 @@ for (const bad of [null, undefined, NaN, 'abc', -5]) {
 }
 check(effDailyElecCost(100, 15, 0.05, 0) > 0, 'coût électrique positif sur des entrées valides');
 
+// --- 8b. Protection de déficit : le résultat d'une journée est max(0, net) --
+// GoMining évalue une fois par jour au paiement et ferme la ferme si elle est
+// négative, TOUS FRAIS ARRÊTÉS. Une ferme au-delà du seuil ne perd donc rien,
+// elle ne gagne rien — et l'upgrade ne réduit pas une facture, il restaure un
+// revenu. Confondre les deux surestimait le risque de baisse.
+{
+  // net(w) = (PR − C2) − C1(w), en USD par TH et par jour.
+  //
+  // La pente DOIT être le vrai coût électrique par W/TH : 24 h / 1000 × tarif,
+  // soit 0,0012 $ à 0,05 $/kWh sans remise. Un premier jet l'avait prise en
+  // GMT : l'égalité (a) ne pouvait alors pas tenir, et l'échec accusait le code
+  // au lieu du fixture. Vérifier les unités avant de conclure.
+  const FARM2 = { th: 100, elecRateKwh: 0.05, discountPct: 0 };
+  const SLOPE = 24 / 1000 * FARM2.elecRateKwh;      // 0,0012 $/TH/jour par W/TH
+  const K = 20.5 * SLOPE;                            // seuil entre 20 et 21 W/TH
+  const net = w => K - w * SLOPE;
+
+  // (a) Les deux états rentables : la généralisation doit rendre EXACTEMENT
+  //     l'écart d'électricité, puisque net(a) − net(b) = C1(b) − C1(a).
+  const sansFn = effEvaluate({ ...FARM2, fromWth: 18, toWth: 16 });
+  const avecFn = effEvaluate({ ...FARM2, fromWth: 18, toWth: 16, netPerThFn: net });
+  check(near(avecFn.dailySaving, (net(16) - net(18)) * 100, 1e-9), 'gain = écart de net × TH');
+  check(net(20) > 0 && net(21) < 0, `le seuil du fixture est bien à 20 W/TH (net20=${net(20).toFixed(5)}, net21=${net(21).toFixed(5)})`);
+  check(avecFn.paused === false, 'pas en pause quand le départ est rentable');
+  // L'égalité est la thèse : mêmes chiffres par deux chemins indépendants.
+  check(near(avecFn.dailySaving, sansFn.dailySaving, 1e-6),
+        `écart d'électricité et écart de net coïncident (${sansFn.dailySaving.toFixed(6)} vs ${avecFn.dailySaving.toFixed(6)})`);
+
+  // (b) Départ en pause : le gain est le revenu ENTIER restauré, pas un delta
+  //     d'électricité qu'on ne paie pas pendant l'arrêt.
+  const r = effEvaluate({ ...FARM2, fromWth: 30, toWth: 16, netPerThFn: net });
+  check(r.paused === true, 'marquée en pause quand net(départ) ≤ 0');
+  check(near(r.dailySaving, net(16) * 100, 1e-9),
+        `gain = tout le net à l'arrivée (attendu ${(net(16)*100).toFixed(4)}, obtenu ${r.dailySaving.toFixed(4)})`);
+  // Et il doit être PLUS GRAND que le simple écart d'électricité : c'est tout
+  // l'enjeu, l'ancien calcul sous-estimait l'intérêt de l'upgrade.
+  const elecOnly = effEvaluate({ ...FARM2, fromWth: 30, toWth: 16 });
+  check(r.dailySaving < elecOnly.dailySaving,
+        `le gain réel est plus petit que l'écart d'électricité brut ici (${r.dailySaving.toFixed(4)} vs ${elecOnly.dailySaving.toFixed(4)}) — on ne crédite pas une économie sur une facture non payée`);
+
+  // (c) Arrivée encore en pause : aucun gain, et aucun crédit fantôme.
+  const still = effEvaluate({ ...FARM2, fromWth: 40, toWth: 30, netPerThFn: net });
+  check(near(still.dailySaving, 0, 1e-12), `toujours en pause → gain nul (obtenu ${still.dailySaving})`);
+  check(still.paybackYears === null, 'pas de retour calculable sans gain');
+
+  // (d) L'échelle transmet bien la fonction.
+  const rows = effLadder({ ...FARM2, fromWth: 45, netPerThFn: net });
+  check(rows.some(x => x.paused === true), 'l\'échelle marque les bandes partant d\'une ferme en pause');
+  check(rows.every(x => x.dailySaving >= 0), 'aucune bande ne montre un gain négatif');
+}
+
 // --- 9. Dégradation propre quand l'app n'est pas chargée ----------------
 // Le premier jet lisait state.lastCalc.dailyProfitUsd, un champ qui N'EXISTE
 // PAS (lastCalc ne porte que hashrate/efficiency/elecCost/discount/satPerTH) :
