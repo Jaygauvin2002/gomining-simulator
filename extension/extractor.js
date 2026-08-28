@@ -1182,16 +1182,31 @@
                     powerField = 'power (bounded)';
                 }
 
-                // Use weighted average for efficiency (always from `power` since
-                // efficiency is paired with raw power in the API)
+                // L'efficacité de la ferme est la moyenne pondérée par le
+                // hashrate : 100 TH à 15 W/TH plus 20 TH à 40 ne font pas 27,5.
                 const basePower = nfts.reduce((acc, n) => acc + (n.power || 0), 0);
-                const totalWatts = nfts.reduce((acc, n) => acc + (n.power || 0) * (n.energyEfficiency || 15), 0);
-                const avgEfficiency = basePower > 0 ? totalWatts / basePower : 15;
+
+                // Un mineur sans efficacité déclarée est EXCLU de la moyenne, il
+                // n'est plus supposé à 15 W/TH. La plage réelle est 12–50 (table
+                // de prix GoMining, plancher à 12 : aucune ligne 12→11), donc
+                // deviner le meilleur cas sous-estimait le coût électrique de
+                // tout le monde sauf des plus efficaces — jusqu'à 3,3× pour une
+                // ferme à 50 W/TH. Sans aucune efficacité connue on renvoie null
+                // et le site garde la valeur saisie plutôt qu'une invention.
+                const rated = nfts.filter(n => (n.power || 0) > 0 && Number(n.energyEfficiency) > 0);
+                const ratedPower = rated.reduce((acc, n) => acc + n.power, 0);
+                const totalWatts = rated.reduce((acc, n) => acc + n.power * Number(n.energyEfficiency), 0);
+                const avgEfficiency = ratedPower > 0 ? totalWatts / ratedPower : null;
                 const main = nfts.reduce((a, b) => (b.power || 0) > (a.power || 0) ? b : a, nfts[0]);
 
                 result.miner = {
                     power: totalPower,
                     energyEfficiency: avgEfficiency,
+                    // Sur combien de TH la moyenne porte réellement, pour que le
+                    // site puisse marquer une moyenne partielle au lieu de la
+                    // présenter comme une mesure complète.
+                    efficiencyRatedPower: ratedPower,
+                    efficiencyPartial: ratedPower > 0 && ratedPower < basePower - 1e-6,
                     level: main.level,
                     name: main.name,
                     minerCount: nfts.length,
@@ -1215,11 +1230,24 @@
                 const bonus = findBonusMiner();
                 if (bonus && bonus.power > 0) {
                     const withBonus = result.miner.power + bonus.power;
-                    // L'efficacité de la ferme est pondérée par la puissance.
-                    const watts = result.miner.power * result.miner.energyEfficiency
-                                + bonus.power * (bonus.efficiency || result.miner.energyEfficiency);
+                    // L'efficacité de la ferme est pondérée par la puissance. Si
+                    // la ferme n'en a aucune de connue, on ne la déduit PAS du
+                    // seul bonus miner : ce serait affirmer que 0,4 TH décrit une
+                    // ferme de 700. Le bonus sans efficacité déclarée hérite de la
+                    // moyenne de la ferme, ce qui est neutre pour cette moyenne.
+                    const farmEff = result.miner.energyEfficiency;
+                    if (farmEff > 0 && withBonus > 0) {
+                        const bonusEff = bonus.efficiency > 0 ? bonus.efficiency : farmEff;
+                        result.miner.energyEfficiency =
+                            (result.miner.power * farmEff + bonus.power * bonusEff) / withBonus;
+                        if (bonus.efficiency > 0) {
+                            result.miner.efficiencyRatedPower =
+                                (result.miner.efficiencyRatedPower || 0) + bonus.power;
+                        }
+                        result.miner.efficiencyPartial =
+                            (result.miner.efficiencyRatedPower || 0) < withBonus - 1e-6;
+                    }
                     result.miner.power = withBonus;
-                    result.miner.energyEfficiency = withBonus > 0 ? watts / withBonus : result.miner.energyEfficiency;
                     result.miner.apiPower = (result.miner.apiPower || 0) + bonus.power;
                     result.miner.minerCount = (result.miner.minerCount || 0) + 1;
                     result.miner.bonusMinerPower = bonus.power;

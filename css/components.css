@@ -67,6 +67,7 @@
 }
 .nav-item.active[data-tab="scenarios"] { box-shadow: inset 2px 0 0 var(--accent2); background: linear-gradient(90deg, var(--info-soft), transparent 75%); }
 .nav-item.active[data-tab="strategy"]  { box-shadow: inset 2px 0 0 var(--a-strategy); background: linear-gradient(90deg, rgba(241,196,15,0.10), transparent 75%); }
+.nav-item.active[data-tab="efficiency"] { box-shadow: inset 2px 0 0 var(--a-efficiency); background: linear-gradient(90deg, rgba(129,140,248,0.10), transparent 75%); }
 .nav-item.active[data-tab="portfolio"] { box-shadow: inset 2px 0 0 var(--green); background: linear-gradient(90deg, var(--success-soft), transparent 75%); }
 
 .nav-item .nav-icon {

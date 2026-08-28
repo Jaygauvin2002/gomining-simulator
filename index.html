@@ -66,6 +66,7 @@
     <link rel="stylesheet" href="css/tokens.css?v=20260505a">
     <link rel="stylesheet" href="css/components.css?v=20260505a">
     <link rel="stylesheet" href="css/strategy-lab.css?v=20260504a">
+    <link rel="stylesheet" href="css/efficiency-calc.css?v=20260828a">
 </head>
 <body>
     <!-- Animated background brand logos — BTC (orange) and GMT (purple)
@@ -454,6 +455,9 @@
             </div>
             <div class="nav-item" data-tab="strategy" onclick="switchTab('strategy')" id="nav-strategy">
                 <span class="nav-icon">🧪</span> <span data-i18n="nav_strategy">Strategy Lab</span>
+            </div>
+            <div class="nav-item" data-tab="efficiency" onclick="switchTab('efficiency')">
+                <span class="nav-icon">⚡</span> <span data-i18n="nav_efficiency">Efficiency</span>
             </div>
             <div class="nav-item" data-tab="portfolio" onclick="switchTab('portfolio')">
                 <span class="nav-icon">💰</span> <span data-i18n="nav_portfolio">Portfolio</span>
@@ -939,8 +943,8 @@
                         </div>
                         <div class="form-group">
                             <label data-i18n="lbl_efficiency">Energy Efficiency (W/TH)</label>
-                            <input type="number" id="efficiency" value="15" min="15" max="50" step="1">
-                            <span class="hint" data-i18n="hint_efficiency">15 W/TH (best) to 50 W/TH (worst)</span>
+                            <input type="number" id="efficiency" value="15" min="12" max="50" step="1">
+                            <span class="hint" data-i18n="hint_efficiency">12 W/TH (best) to 50 W/TH (worst)</span>
                         </div>
                         <div class="form-group">
                             <label data-i18n="lbl_elec_cost">Electricity Cost ($/kWh)</label>
@@ -1259,7 +1263,7 @@
                     </div>
                     <div class="form-group">
                         <label data-i18n="lbl_new_efficiency">New/Upgrade Efficiency (W/TH)</label>
-                        <input type="number" id="new-efficiency" value="15" min="15" max="50" step="1">
+                        <input type="number" id="new-efficiency" value="15" min="12" max="50" step="1">
                     </div>
                     <div class="form-group">
                         <label data-i18n="lbl_lock_duration">GMT Lock Duration (years)</label>
@@ -1514,6 +1518,85 @@
             <div id="strategy-results" style="display:none;margin-top:20px;"></div>
         </div>
 
+        <!-- ============ EFFICIENCY CALCULATOR ============ -->
+        <div class="tab-content" id="tab-efficiency">
+
+            <div class="eff-hero">
+                <span class="eff-eyebrow" data-i18n="eff_eyebrow">Watts · Cost · Payback</span>
+                <h1 class="eff-title" data-i18n="eff_title">⚡ Efficiency Calculator</h1>
+                <p class="eff-sub" data-i18n="eff_intro">Lowering your W/TH cuts your electricity bill every day and costs you once. GoMining shows the price; it does not show the payback. This does — and tells you where to stop.</p>
+
+                <div class="eff-controls">
+                    <div class="eff-field">
+                        <label for="eff-th" data-i18n="eff_f_th">Hashrate (TH)</label>
+                        <input type="number" id="eff-th" min="1" step="1">
+                        <span class="eff-hint" data-i18n="eff_f_th_hint">From your farm</span>
+                    </div>
+                    <div class="eff-field">
+                        <label for="eff-from" data-i18n="eff_f_from">Current (W/TH)</label>
+                        <input type="number" id="eff-from" min="12" max="50" step="1">
+                        <span class="eff-hint" data-i18n="eff_f_from_hint">Hashrate-weighted</span>
+                    </div>
+                    <div class="eff-field">
+                        <label for="eff-to" data-i18n="eff_f_to">Target (W/TH)</label>
+                        <input type="number" id="eff-to" min="12" max="50" step="1">
+                        <span class="eff-hint" data-i18n="eff_f_to_hint">12 is the floor</span>
+                    </div>
+                    <div class="eff-field">
+                        <label for="eff-elec" data-i18n="eff_f_elec">Electricity ($/kWh)</label>
+                        <input type="number" id="eff-elec" min="0.01" max="0.20" step="0.001">
+                        <span class="eff-hint" data-i18n="eff_f_elec_hint">Detected</span>
+                    </div>
+                    <div class="eff-field">
+                        <label for="eff-disc" data-i18n="eff_f_disc">Discount (%)</label>
+                        <input type="number" id="eff-disc" min="0" max="100" step="0.1">
+                        <span class="eff-hint" data-i18n="eff_f_disc_hint">Cuts the saving, not the price</span>
+                    </div>
+                    <button type="button" class="eff-reset" onclick="effResetToFarm()" data-i18n="eff_reset">Reset to my farm</button>
+                </div>
+            </div>
+
+            <div class="eff-card">
+                <h2 class="eff-card-title" data-i18n="eff_r_title">What this upgrade costs and returns</h2>
+                <p class="eff-card-sub" data-i18n="eff_r_sub">The upgrade is charged at full price — your discount does not apply to it. It applies to the electricity, which means it also shrinks the saving and lengthens the payback.</p>
+                <div id="eff-result"></div>
+                <div class="eff-compare" id="eff-compare"></div>
+            </div>
+
+            <div class="eff-card">
+                <h2 class="eff-card-title" data-i18n="eff_l_title">Where to stop</h2>
+                <p class="eff-card-sub" data-i18n="eff_l_sub">GoMining prices the easy watts at almost nothing and the last few at a premium. Each row is one price band: read down and stop where the return no longer justifies it. Click a row to set it as your target.</p>
+                <div class="eff-ladder-wrap">
+                    <table class="eff-ladder">
+                        <thead>
+                            <tr>
+                                <th data-i18n="eff_l_step">Step</th>
+                                <th data-i18n="eff_l_cost">Cost</th>
+                                <th data-i18n="eff_l_saving">Saved / day</th>
+                                <th data-i18n="eff_l_payback">Payback</th>
+                                <th data-i18n="eff_l_return">Annual return</th>
+                            </tr>
+                        </thead>
+                        <tbody id="eff-ladder-body"></tbody>
+                    </table>
+                </div>
+                <p class="eff-ladder-hint" data-i18n="eff_l_hint">Highlighted rows are inside your current target. Cumulative figures assume you take every band above.</p>
+            </div>
+
+            <div class="eff-card eff-notes">
+                <h2 class="eff-card-title" data-i18n="eff_n_title">What this does and does not account for</h2>
+                <ul style="list-style:none;padding:0;margin-top:14px">
+                    <li data-i18n="eff_n_1"><strong>It is not a bet on Bitcoin.</strong> Your hashrate does not change, so your revenue does not either. Both the cost and the saving are in dollars — this is one of the few GoMining decisions whose payback does not depend on the BTC price.</li>
+                    <li data-i18n="eff_n_2"><strong>Payback is the same at any farm size.</strong> Cost and saving both scale per TH, so 16 TH and 700 TH pay back on the same date. You cannot start small to test it.</li>
+                    <li data-i18n="eff_n_3"><strong>Resale value is not counted, so the payback is pessimistic.</strong> A more efficient miner sells for more per TH on the secondary market, which shortens the real payback by an amount we cannot yet measure. For the cheap bands it changes nothing; for the last three watts it may decide the question entirely.</li>
+                    <li data-i18n="eff_n_6"><strong>A paused farm changes the maths.</strong> GoMining pauses a farm that would mine at a loss, so above a certain W/TH it earns nothing instead of losing money — and pays no electricity while paused. For such a farm the upgrade does not cut a bill, it restores income, and the figures above only apply once it is running again.</li>
+                    <li data-i18n="eff_n_5"><strong>Inside one price band, the payback is flat.</strong> Cost and saving both scale with the number of steps, so stopping halfway through a band buys you nothing in return — it only spends less. If a band is worth entering, it is worth taking to its floor.</li>
+                    <li data-i18n="eff_n_4"><strong>Prices are the ones GoMining published on 28 August 2026</strong>, fixed in USD. They change only when GoMining reprices, and this table will not know until it is updated.</li>
+                </ul>
+            </div>
+
+        </div>
+
         <div class="tab-content" id="tab-portfolio">
 
             <!-- HERO: P&L spotlight + supporting stats -->
@@ -1713,6 +1796,7 @@
          getLastCompleteRewardDay) that are defined in the inline script —
          that's fine, they only execute when called. -->
     <script src="js/strategy-lab.js?v=20260504a"></script>
+    <script src="js/efficiency-calc.js?v=20260828a"></script>
 
     <script>
         // ===== STATE =====
@@ -3314,7 +3398,7 @@
             // Set section accent color
             const accentMap = {
                 dashboard: '--a-dashboard', mining: '--a-mining', scenarios: '--a-scenarios',
-                strategy: '--a-strategy',
+                strategy: '--a-strategy', efficiency: '--a-efficiency',
                 reinvest: '--a-reinvest', compare: '--a-compare', multisim: '--a-multisim', performance: '--a-performance',
                 alerts: '--red', portfolio: '--accent'
             };
@@ -3328,6 +3412,7 @@
             if (name === 'scenarios' && state.lastCalc) updateScenarios();
             if (name === 'multisim' && state.lastCalc) updateMultiSim();
             if (name === 'performance') updatePerformance();
+            if (name === 'efficiency' && typeof updateEfficiencyCalc === 'function') updateEfficiencyCalc();
             if (name === 'alerts') checkPriceAlerts();
             if (name === 'portfolio') updatePortfolio();
         }
@@ -5020,6 +5105,48 @@ function renderCalendar(history, chartEl) {
                 nav_strategy: 'Strategy Lab',
                 nav_reinvest: 'Reinvestment', nav_compare: 'Compare', nav_simulation: 'Simulation',
                 nav_performance: 'Performance', nav_alerts: 'Alerts', nav_portfolio: 'Portfolio',
+                nav_efficiency: 'Efficiency',
+                eff_n_6: '<strong>A paused farm changes the maths.</strong> GoMining pauses a farm that would mine at a loss, so above a certain W/TH it earns nothing instead of losing money — and pays no electricity while paused. For such a farm the upgrade does not cut a bill, it restores income, and the figures above only apply once it is running again.',
+                eff_cmp_paused: 'GoMining pauses a farm that would mine at a loss and restarts it when it turns profitable again. At this efficiency the farm earns nothing rather than losing money — so the electricity saving above only applies once it is running.',
+                eff_cmp_paused_reach: 'It needs to reach',
+                eff_cmp_paused_costs: ' to run again, which costs ',
+                eff_cmp_paused_nofix: 'It does not turn profitable at any efficiency down to 12 W/TH — check your electricity rate and Pool Reward before spending anything.',
+                eff_n_1: '<strong>It is not a bet on Bitcoin.</strong> Your hashrate does not change, so your revenue does not either. Both the cost and the saving are in dollars — this is one of the few GoMining decisions whose payback does not depend on the BTC price.',
+                eff_n_2: '<strong>Payback is the same at any farm size.</strong> Cost and saving both scale per TH, so 16 TH and 700 TH pay back on the same date. You cannot start small to test it.',
+                eff_n_3: '<strong>Resale value is not counted, so the payback is pessimistic.</strong> A more efficient miner sells for more per TH on the secondary market, which shortens the real payback by an amount we cannot yet measure. For the cheap bands it changes nothing; for the last three watts it may decide the question entirely.',
+                eff_n_4: '<strong>Prices are the ones GoMining published on 28 August 2026</strong>, fixed in USD. They change only when GoMining reprices, and this table will not know until it is updated.',
+                eff_n_5: '<strong>Inside one price band, the payback is flat.</strong> Cost and saving both scale with the number of steps, so stopping halfway through a band buys you nothing in return — it only spends less. If a band is worth entering, it is worth taking to its floor.',
+                eff_eyebrow: 'Watts · Cost · Payback',
+                eff_title: '⚡ Efficiency Calculator',
+                eff_intro: 'Lowering your W/TH cuts your electricity bill every day and costs you once. GoMining shows the price; it does not show the payback. This does — and tells you where to stop.',
+                eff_f_th: 'Hashrate (TH)', eff_f_th_hint: 'From your farm',
+                eff_f_from: 'Current (W/TH)', eff_f_from_hint: 'Hashrate-weighted',
+                eff_f_to: 'Target (W/TH)', eff_f_to_hint: '12 is the floor',
+                eff_f_elec: 'Electricity ($/kWh)', eff_f_elec_hint: 'Detected',
+                eff_f_disc: 'Discount (%)', eff_f_disc_hint: 'Cuts the saving, not the price',
+                eff_reset: 'Reset to my farm',
+                eff_r_title: 'What this upgrade costs and returns',
+                eff_r_sub: 'The upgrade is charged at full price — your discount does not apply to it. It applies to the electricity, which means it also shrinks the saving and lengthens the payback.',
+                eff_l_title: 'Where to stop',
+                eff_l_sub: 'GoMining prices the easy watts at almost nothing and the last few at a premium. Each row is one price band: read down and stop where the return no longer justifies it. Click a row to set it as your target.',
+                eff_l_step: 'Step', eff_l_cost: 'Cost', eff_l_saving: 'Saved / day',
+                eff_l_payback: 'Payback', eff_l_return: 'Annual return',
+                eff_l_hint: 'Highlighted rows are inside your current target. Cumulative figures assume you take every band above.',
+                eff_n_title: 'What this does and does not account for',
+                eff_k_cost: 'Upgrade cost', eff_k_saving: 'Electricity saved',
+                eff_k_payback: 'Payback', eff_k_payback_sub: 'independent of farm size',
+                eff_k_return: 'Annual return',
+                eff_day: 'day', eff_year: 'yr', eff_days: 'days', eff_years: 'yr',
+                eff_saved: 'saved', eff_cum: 'cumulative',
+                eff_v_great: 'far better than buying TH', eff_v_good: 'better than buying TH',
+                eff_v_close: 'about the same as buying TH', eff_v_poor: 'worse than buying TH',
+                eff_v_fast: 'pays back fast', eff_v_solid: 'solid return',
+                eff_v_slow: 'slow return', eff_v_verylow: 'very low return',
+                eff_cmp_label: 'For comparison, a dollar spent on more hashrate returns',
+                eff_cmp_per_year: 'per year',
+                eff_cmp_missing: 'Buying-hashrate return is unknown until your farm data is loaded — scan your GoMining pages to compare the two.',
+                eff_pick_lower: 'Pick a target below your current efficiency to see what it costs and what it pays back.',
+                eff_at_floor: 'You are at 12 W/TH — the floor. There is nothing left to upgrade.',
                 sec_strategy_lab: '🧪 Strategy Lab',
                 strategy_intro: "Build a day-by-day reinvestment plan and see what you'd earn over the period. Choose for each day: collect BTC, reinvest in GMT, or buy more TH.",
                 strategy_period: 'Period',
@@ -5107,7 +5234,7 @@ function renderCalendar(history, chartEl) {
                 // Mining form
                 lbl_hashrate: 'Hashrate (TH/s)', lbl_efficiency: 'Energy Efficiency (W/TH)', lbl_elec_cost: 'Electricity Cost ($/kWh)',
                 lbl_gmt_wallet: 'GMT in Wallet', lbl_gmt_locked: 'GMT Locked (tokenomics)', lbl_sat_per_th: 'sat/TH/day (PR)',
-                hint_hashrate: '1 TH/s (level 1) to 5000 TH/s (level 20)', hint_efficiency: '15 W/TH (best) to 50 W/TH (worst)',
+                hint_hashrate: '1 TH/s (level 1) to 5000 TH/s (level 20)', hint_efficiency: '12 W/TH (best) to 50 W/TH (worst)',
                 hint_elec_cost: 'Auto-filled from GoMining\'s own rate', hint_gmt_wallet: 'Virtual GMT wallet balance',
                 hint_gmt_locked: 'Tokens locked in veGOMINING', hint_sat_per_th: 'Auto-calculated — manually adjustable from your dashboard',
                 // Result cards
@@ -5300,6 +5427,48 @@ function renderCalendar(history, chartEl) {
                 nav_strategy: 'Labo Stratégie',
                 nav_reinvest: 'Réinvestissement', nav_compare: 'Comparer', nav_simulation: 'Simulation',
                 nav_performance: 'Performance', nav_alerts: 'Alertes', nav_portfolio: 'Portfolio',
+                nav_efficiency: 'Efficacité',
+                eff_n_6: '<strong>Une ferme en pause change le calcul.</strong> GoMining met en pause une ferme qui minerait à perte : au-delà d\'un certain W/TH elle ne gagne rien au lieu de perdre — et ne paie pas d\'électricité pendant l\'arrêt. Pour une telle ferme, l\'upgrade ne réduit pas une facture, il restaure un revenu, et les chiffres ci-dessus ne s\'appliquent qu\'une fois qu\'elle tourne.',
+                eff_cmp_paused: 'GoMining met en pause une ferme qui minerait à perte et la redémarre quand elle redevient rentable. À cette efficacité, la ferme ne gagne rien plutôt que de perdre — donc l\'économie d\'électricité ci-dessus ne s\'applique qu\'une fois qu\'elle tourne.',
+                eff_cmp_paused_reach: 'Il lui faut atteindre',
+                eff_cmp_paused_costs: ' pour repartir, ce qui coûte ',
+                eff_cmp_paused_nofix: 'Elle ne redevient rentable à aucune efficacité jusqu\'à 12 W/TH — vérifie ton tarif électrique et ton Pool Reward avant de dépenser quoi que ce soit.',
+                eff_n_1: '<strong>Ce n\'est pas un pari sur le Bitcoin.</strong> Ton hashrate ne change pas, donc ton revenu non plus. Le coût et l\'économie sont tous deux en dollars — c\'est l\'une des rares décisions GoMining dont le retour ne dépend pas du prix du BTC.',
+                eff_n_2: '<strong>Le retour est le même quelle que soit la taille de la ferme.</strong> Le coût et l\'économie montent tous deux par TH : 16 TH et 700 TH se rentabilisent à la même date. Impossible d\'essayer petit pour voir.',
+                eff_n_3: '<strong>La valeur de revente n\'est pas comptée, donc le retour est pessimiste.</strong> Un mineur plus efficace se revend plus cher par TH sur le marché secondaire, ce qui raccourcit le vrai retour d\'un montant qu\'on ne sait pas encore mesurer. Pour les bandes bon marché ça ne change rien ; pour les trois derniers watts, ça peut tout décider.',
+                eff_n_4: '<strong>Les prix sont ceux affichés par GoMining le 28 août 2026</strong>, fixes en USD. Ils ne changent que quand GoMining reprice, et cette table ne le saura pas avant d\'être mise à jour.',
+                eff_n_5: '<strong>À l\'intérieur d\'une bande de prix, le retour est plat.</strong> Le coût et l\'économie montent tous deux avec le nombre de paliers : s\'arrêter au milieu d\'une bande n\'améliore rien, ça dépense seulement moins. Si une bande vaut la peine d\'être entamée, elle vaut la peine d\'être terminée.',
+                eff_eyebrow: 'Watts · Coût · Retour',
+                eff_title: '⚡ Calculateur d\'efficacité',
+                eff_intro: 'Baisser ton W/TH réduit ta facture d\'électricité chaque jour et te coûte une seule fois. GoMining affiche le prix, jamais le retour. Ceci le calcule — et te dit où arrêter.',
+                eff_f_th: 'Hashrate (TH)', eff_f_th_hint: 'Depuis ta ferme',
+                eff_f_from: 'Actuel (W/TH)', eff_f_from_hint: 'Pondéré par le hashrate',
+                eff_f_to: 'Cible (W/TH)', eff_f_to_hint: '12 est le plancher',
+                eff_f_elec: 'Électricité ($/kWh)', eff_f_elec_hint: 'Détecté',
+                eff_f_disc: 'Remise (%)', eff_f_disc_hint: 'Réduit l\'économie, pas le prix',
+                eff_reset: 'Revenir à ma ferme',
+                eff_r_title: 'Ce que cet upgrade coûte et rapporte',
+                eff_r_sub: 'L\'upgrade est facturé plein prix — ta remise ne s\'y applique pas. Elle s\'applique à l\'électricité, donc elle réduit aussi l\'économie et allonge le retour.',
+                eff_l_title: 'Où s\'arrêter',
+                eff_l_sub: 'GoMining vend les watts faciles presque gratuitement et les derniers à prix d\'or. Chaque ligne est un palier de prix : lis vers le bas et arrête-toi quand le rendement ne le justifie plus. Clique une ligne pour en faire ta cible.',
+                eff_l_step: 'Palier', eff_l_cost: 'Coût', eff_l_saving: 'Économie / jour',
+                eff_l_payback: 'Retour', eff_l_return: 'Rendement annuel',
+                eff_l_hint: 'Les lignes surlignées sont dans ta cible actuelle. Les cumuls supposent que tu prends tous les paliers au-dessus.',
+                eff_n_title: 'Ce que ce calcul prend en compte, et ce qu\'il ignore',
+                eff_k_cost: 'Coût de l\'upgrade', eff_k_saving: 'Électricité économisée',
+                eff_k_payback: 'Retour', eff_k_payback_sub: 'indépendant de la taille de la ferme',
+                eff_k_return: 'Rendement annuel',
+                eff_day: 'jour', eff_year: 'an', eff_days: 'jours', eff_years: 'ans',
+                eff_saved: 'économisés', eff_cum: 'cumulé',
+                eff_v_great: 'bien mieux qu\'acheter du TH', eff_v_good: 'mieux qu\'acheter du TH',
+                eff_v_close: 'équivalent à acheter du TH', eff_v_poor: 'moins bien qu\'acheter du TH',
+                eff_v_fast: 'se rentabilise vite', eff_v_solid: 'bon rendement',
+                eff_v_slow: 'rendement lent', eff_v_verylow: 'rendement très faible',
+                eff_cmp_label: 'À titre de comparaison, un dollar mis en hashrate rapporte',
+                eff_cmp_per_year: 'par an',
+                eff_cmp_missing: 'Le rendement du hashrate est inconnu tant que les données de ta ferme ne sont pas chargées — scanne tes pages GoMining pour comparer les deux.',
+                eff_pick_lower: 'Choisis une cible sous ton efficacité actuelle pour voir ce que ça coûte et ce que ça rapporte.',
+                eff_at_floor: 'Tu es à 12 W/TH — le plancher. Il n\'y a plus rien à améliorer.',
                 sec_strategy_lab: '🧪 Labo Stratégie',
                 strategy_intro: "Construis un plan de réinvestissement jour par jour et vois combien tu gagnerais sur la période. Choisis pour chaque jour : collecter BTC, réinvestir en GMT, ou acheter du TH.",
                 strategy_period: 'Période',
@@ -5387,7 +5556,7 @@ function renderCalendar(history, chartEl) {
                 // Mining form
                 lbl_hashrate: 'Puissance de calcul (TH/s)', lbl_efficiency: 'Efficacité énergétique (W/TH)', lbl_elec_cost: 'Coût électricité ($/kWh)',
                 lbl_gmt_wallet: 'GMT dans le wallet', lbl_gmt_locked: 'GMT locked (tokenomics)', lbl_sat_per_th: 'sat/TH/jour (PR)',
-                hint_hashrate: '1 TH/s (niveau 1) à 5000 TH/s (niveau 20)', hint_efficiency: '15 W/TH (meilleur) à 50 W/TH (pire)',
+                hint_hashrate: '1 TH/s (niveau 1) à 5000 TH/s (niveau 20)', hint_efficiency: '12 W/TH (meilleur) à 50 W/TH (pire)',
                 hint_elec_cost: 'Renseigné automatiquement au tarif GoMining', hint_gmt_wallet: 'Balance GMT virtuel wallet',
                 hint_gmt_locked: 'Tokens lockés en veGOMINING', hint_sat_per_th: 'Auto-calculé — ajustable manuellement depuis ton dashboard',
                 // Result cards
@@ -5676,7 +5845,11 @@ function renderCalendar(history, chartEl) {
         function validateInputs() {
             const rules = {
                 'hashrate': { min: 0.001, max: 10000 },
-                'efficiency': { min: 15, max: 50 },
+                // 12 W/TH est le plancher réel (table de prix GoMining : aucune
+                // ligne 12→11). Cette règle RÉÉCRIT la valeur, elle ne la refuse
+                // pas — à 15 elle écrasait donc en silence les fermes les plus
+                // efficaces, +25 % de coût électrique sur le calcul.
+                'efficiency': { min: 12, max: 50 },
                 'elec-cost': { min: 0.01, max: 1 },
                 'sat-per-th': { min: 1, max: 1000 },
                 'gmt-prepaid': { min: 0, max: 100000 },
@@ -6536,7 +6709,7 @@ function renderCalendar(history, chartEl) {
         // Apply URL hash → switch to the matching tab on page load
         try {
             const hash = (location.hash || '').replace('#', '');
-            const VALID_TABS = ['dashboard', 'mining', 'scenarios', 'strategy', 'portfolio'];
+            const VALID_TABS = ['dashboard', 'mining', 'scenarios', 'strategy', 'efficiency', 'portfolio'];
             if (VALID_TABS.includes(hash)) switchTab(hash);
         } catch(_) {}
         // Browser back/forward → switch tabs accordingly
@@ -6645,6 +6818,7 @@ function renderCalendar(history, chartEl) {
         });
         fetchLiveData();
         initStrategyLab();
+        if (typeof initEfficiencyCalc === 'function') initEfficiencyCalc();
 
         // Register PWA service worker
         // Unregister any old service workers (causes caching issues)

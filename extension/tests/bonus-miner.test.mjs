@@ -86,7 +86,12 @@ check(/const bonus = findBonusMiner\(\);/.test(SRC),
       'la somme doit consommer le résultat de findBonusMiner(), pas une constante');
 check(/bonusMinerPower/.test(SRC), 'result.miner.bonusMinerPower doit être exposé pour diagnostic');
 check(/api\+bonus/.test(SRC), 'powerSource doit signaler api+bonus');
-check(/bonus\.power \* \(bonus\.efficiency/.test(SRC), 'l’efficacité doit être pondérée par la puissance du bonus');
+// Garde-fou de forme uniquement : que la puissance du bonus participe bien à
+// une pondération d'efficacité. L'ARITHMÉTIQUE est vérifiée en l'exécutant dans
+// efficiency.test.mjs (contrôles 5 à 7) — une regex sur le texte source ne peut
+// pas distinguer un calcul juste d'un calcul faux, et casse au moindre renommage.
+check(/bonus\.power \* (bonusEff|\(?bonus\.efficiency)/.test(SRC),
+      'l’efficacité doit être pondérée par la puissance du bonus');
 
 const total = pass + fails.length;
 if (fails.length) {
