@@ -28,6 +28,12 @@ const SHELL = [
     './css/tokens.css',
     './css/main.css',
     './css/components.css',
+    // Le cœur de l'app, extrait de index.html : 320 Ko qui ne changent qu'au
+    // déploiement. C'est précisément ce que le HTML réseau-d'abord ne pouvait
+    // pas mettre en cache tant que ce code était inline.
+    './js/app.js',
+    './js/strategy-lab.js',
+    './js/efficiency-calc.js',
     './icon-192.png',
     './manifest.webmanifest',
 ];

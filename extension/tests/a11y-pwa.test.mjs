@@ -16,7 +16,14 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
-const HTML = readFileSync(join(root, 'index.html'), 'utf8');
+// Le cœur de l'app a été extrait de index.html vers js/app.js le 2026-08-28.
+// On lit donc l'UNION des deux : les tests cherchent du code et du markup, et
+// l'app est la somme. Écrit ainsi, une prochaine extraction ne cassera pas
+// onze suites d'un coup — il suffira d'ajouter le fichier à la liste.
+const APP_SOURCES = ['index.html', 'js/app.js', 'js/strategy-lab.js', 'js/efficiency-calc.js'];
+const HTML = APP_SOURCES
+  .map(f => { try { return readFileSync(join(root, ...f.split('/')), 'utf8'); } catch { return ''; } })
+  .join('\n');
 const SW   = readFileSync(join(root, 'sw.js'), 'utf8');
 const MAN  = JSON.parse(readFileSync(join(root, 'manifest.webmanifest'), 'utf8'));
 const CSS  = ['components.css', 'main.css', 'tokens.css', 'efficiency-calc.css']

@@ -2895,3 +2895,27 @@ a.scan-page::after { content: ' ↗'; font-size: .78em; opacity: .6; }
     border-radius: 6px;
 }
 .nav-item:focus-visible .nav-icon { transform: none; }
+
+/* Origine des prix. Deux niveaux, sémantiques et distincts de l'accent :
+   ambre = prix périmé mais réel, rouge = prix inventé, donc chiffres sans
+   valeur. Masquée quand tout va bien — une bannière permanente n'est plus lue. */
+.price-origin {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: var(--fs-note, 0.75rem);
+    line-height: 1.5;
+    border: 1px solid transparent;
+}
+.price-origin[hidden] { display: none; }
+.price-origin--warn {
+    background: rgba(210, 153, 34, 0.10);
+    border-color: rgba(210, 153, 34, 0.30);
+    color: #e3b341;
+}
+.price-origin--bad {
+    background: rgba(248, 81, 73, 0.10);
+    border-color: rgba(248, 81, 73, 0.32);
+    color: #ff9492;
+    font-weight: 600;
+}
