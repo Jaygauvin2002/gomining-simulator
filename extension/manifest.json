@@ -1,37 +1,65 @@
 {
   "manifest_version": 3,
   "name": "GMSim — Miner Sync (DEV)",
-  "version": "4.6",
+  "version": "4.7",
   "description": "Sync your GoMining NFT miner data into GMSim, an independent mining profitability simulator. No account, no tracking.",
   "icons": {
     "16": "icon-16.png",
     "48": "icon-48.png",
     "128": "icon-128.png"
   },
-  "permissions": ["storage"],
-  "host_permissions": ["https://app.gomining.com/*", "https://api.gomining.com/*"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://app.gomining.com/*",
+    "https://api.gomining.com/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://app.gomining.com/*"],
-      "js": ["inject-early.js"],
+      "matches": [
+        "https://app.gomining.com/*"
+      ],
+      "js": [
+        "inject-early.js"
+      ],
       "run_at": "document_start"
     },
     {
-      "matches": ["https://app.gomining.com/*"],
-      "js": ["extractor.js"],
-      "css": ["panel.css"],
+      "matches": [
+        "https://app.gomining.com/*"
+      ],
+      "js": [
+        "extractor.js"
+      ],
+      "css": [
+        "panel.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://gmsim.ca/*", "https://www.gmsim.ca/*", "https://jaygauvin2002.github.io/gomining-preview/*"],
-      "js": ["sync-bridge.js"],
+      "matches": [
+        "https://gmsim.ca/*",
+        "https://www.gmsim.ca/*",
+        "https://jaygauvin2002.github.io/gomining-preview/*"
+      ],
+      "js": [
+        "sync-bridge.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["interceptor.js", "icon-128.png", "icon-48.png", "icon-16.png"],
-      "matches": ["https://app.gomining.com/*"]
+      "resources": [
+        "interceptor.js",
+        "icon-128.png",
+        "icon-48.png",
+        "icon-16.png"
+      ],
+      "matches": [
+        "https://app.gomining.com/*"
+      ]
     }
   ]
 }
