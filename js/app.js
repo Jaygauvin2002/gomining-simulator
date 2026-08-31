@@ -189,8 +189,106 @@
             }
         }
 
+        // ===== ARBITRAGE SAISIE MANUELLE / EXTENSION =====
+        //
+        // Les deux sources doivent coexister sans que l'une écrase l'autre en
+        // silence. Avant, l'extension gagnait toujours : elle réécrivait le
+        // champ à chaque synchro, donc une valeur tapée à la main disparaissait
+        // sans un mot. Maintenant qu'on peut utiliser le simulateur sans compte
+        // ni extension, ça devient inacceptable dans les deux sens.
+        //
+        // Règle : un champ que l'utilisateur a modifié À LA MAIN est « épinglé »
+        // et la synchro ne le touche plus. Mais elle ne se tait pas non plus —
+        // elle signale qu'elle a une valeur différente et propose de basculer.
+        // Le conflit est montré, jamais tranché à l'insu de la personne.
+        //
+        // Une écriture programmatique de .value ne déclenche PAS d'événement
+        // 'input', donc l'écouteur ne voit que les frappes humaines. C'est ce
+        // qui rend la distinction fiable sans drapeau à poser partout.
+        const PIN_KEY = 'gms_pinned_fields';
+        const ARBITRATED = ['hashrate', 'efficiency', 'elec-cost', 'sat-per-th'];
+        let pinnedFields = new Set();
+        try {
+            const raw = JSON.parse(localStorage.getItem(PIN_KEY));
+            if (Array.isArray(raw)) pinnedFields = new Set(raw.filter(x => ARBITRATED.includes(x)));
+        } catch (e) {}
+        // Ce que la synchro AURAIT écrit dans un champ épinglé, pour pouvoir
+        // l'offrir au lieu de le perdre.
+        const syncPending = {};
+
+        function savePins() {
+            try { localStorage.setItem(PIN_KEY, JSON.stringify([...pinnedFields])); } catch (e) {}
+        }
+
+        // Écriture par une source automatique : extension, mempool, API GoMining.
+        // Retourne true si le champ a été écrit.
+        function syncField(id, value) {
+            const el = document.getElementById(id);
+            if (!el || value === undefined || value === null || value === '') return false;
+            if (pinnedFields.has(id)) {
+                const same = Math.abs((parseFloat(el.value) || 0) - (parseFloat(value) || 0)) < 1e-9;
+                if (same) { delete syncPending[id]; }
+                else { syncPending[id] = value; }
+                renderPinNotice();
+                return false;
+            }
+            el.value = value;
+            delete syncPending[id];
+            renderPinNotice();
+            return true;
+        }
+
+        function pinField(id) {
+            if (!ARBITRATED.includes(id) || pinnedFields.has(id)) return;
+            pinnedFields.add(id);
+            savePins();
+            renderPinNotice();
+        }
+
+        // Rendre la main à la synchro sur tous les champs.
+        function unpinAll() {
+            pinnedFields.clear();
+            savePins();
+            for (const [id, v] of Object.entries(syncPending)) {
+                const el = document.getElementById(id);
+                if (el) el.value = v;
+                delete syncPending[id];
+            }
+            renderPinNotice();
+            try { saveSettings(); calculate(); } catch (e) {}
+        }
+
+        let pinNoticeDismissed = false;
+        function keepMine() { pinNoticeDismissed = true; renderPinNotice(); }
+
+        const FIELD_LABELS = {
+            'hashrate': () => t('dh_hashrate', 'hashrate'),
+            'efficiency': () => t('lbl_efficiency', 'efficiency'),
+            'elec-cost': () => t('lbl_elec', 'electricity'),
+            'sat-per-th': () => t('dh_pool_reward', 'Pool Reward'),
+        };
+
+        function renderPinNotice() {
+            const el = document.getElementById('pin-notice');
+            if (!el) return;
+            const ids = Object.keys(syncPending);
+            if (!ids.length || pinNoticeDismissed) { el.hidden = true; return; }
+            el.hidden = false;
+            el.className = 'price-origin price-origin--warn';
+            const list = ids.map(id => {
+                const cur = document.getElementById(id)?.value;
+                return `${(FIELD_LABELS[id] || (() => id))()} ${cur} → ${syncPending[id]}`;
+            }).join(' · ');
+            el.innerHTML = `${t('pin_conflict', 'Your extension reports different values than the ones you typed:')} `
+                + `<strong>${list}</strong> `
+                + `<button type="button" class="pin-btn" onclick="unpinAll()">${t('pin_use_ext', 'Use extension data')}</button> `
+                + `<button type="button" class="pin-btn pin-btn--ghost" onclick="keepMine()">${t('pin_keep_mine', 'Keep mine')}</button>`;
+        }
+
         // Auto-update discount quand les champs changent
         document.addEventListener('input', function(e) {
+            // Une frappe humaine épingle le champ : la synchro ne l'écrasera plus.
+            if (ARBITRATED.includes(e.target.id)) pinField(e.target.id);
             const discountFields = ['discount-maintenance', 'discount-vip', 'discount-streak', 'discount-solo'];
             if (discountFields.includes(e.target.id)) {
                 calcTotalDiscount();
@@ -305,7 +403,7 @@
                         // Ne pas écraser le sat/TH de l'API GoMining (plus précis)
                         if (!state.apiSatPerTH) {
                             state.satPerTH = mempoolSatPerTH;
-                            document.getElementById('sat-per-th').value = state.satPerTH;
+                            syncField('sat-per-th', state.satPerTH);
                         }
                         state.mempoolSatPerTH = mempoolSatPerTH; // garder pour référence
                     }
@@ -334,7 +432,7 @@
                 updatePrepaidDiscount();
                 // Force API sat/TH if available (prevents mempool from overriding)
                 if (state.apiSatPerTH) {
-                    document.getElementById('sat-per-th').value = state.apiSatPerTH;
+                    syncField('sat-per-th', state.apiSatPerTH);
                     state.satPerTH = state.apiSatPerTH;
                 }
                 calculate();
@@ -1909,8 +2007,8 @@
         function applyEssentials(data) {
 
             // Miner
-            if (data.miner?.power) document.getElementById('hashrate').value = data.miner.power;
-            if (data.miner?.energyEfficiency) document.getElementById('efficiency').value = data.miner.energyEfficiency;
+            if (data.miner?.power) syncField('hashrate', data.miner.power);
+            if (data.miner?.energyEfficiency) syncField('efficiency', data.miner.energyEfficiency);
 
             // L'extension capte plus que ce qu'on affichait. Ces champs
             // existaient depuis des versions sans jamais être lus :
@@ -1987,8 +2085,7 @@
                 try { localStorage.setItem('gms_lifetime_income', JSON.stringify(data.income.lifetime)); } catch (e) {}
             }
             if (data.income?.elecCostKwh > 0) {
-                const el = document.getElementById('elec-cost');
-                if (el) el.value = data.income.elecCostKwh;
+                syncField('elec-cost', data.income.elecCostKwh);
             }
             if (data.income?.gbpSatPerTh !== undefined) state.gbpSatPerTh = data.income.gbpSatPerTh;
             if (data.income?.reinvestCommissionRate !== undefined) state.reinvestCommissionRate = data.income.reinvestCommissionRate;
@@ -2078,7 +2175,7 @@
                 }
 
                 if (satPerTH) {
-                    document.getElementById('sat-per-th').value = satPerTH;
+                    syncField('sat-per-th', satPerTH);
                     state.satPerTH = satPerTH;
                     state.apiSatPerTH = satPerTH;
                     document.getElementById('net-hashrate').textContent = satPerTH + ' PR';
@@ -3498,6 +3595,11 @@ function renderCalendar(history, chartEl) {
                 nav_reinvest: 'Reinvestment', nav_compare: 'Compare', nav_simulation: 'Simulation',
                 nav_performance: 'Performance', nav_alerts: 'Alerts', nav_portfolio: 'Portfolio',
                 nav_efficiency: 'Efficiency',
+                pin_conflict: 'Your extension reports different values than the ones you typed:',
+                pin_use_ext: 'Use extension data',
+                pin_keep_mine: 'Keep mine',
+                gate_guest: 'Use it without an account →',
+                gate_guest_note: 'Full calculator, no sign-up. An account saves your scenarios; the extension fills your numbers in for you.',
                 sw_quota: 'This browser\'s storage is full, so your reward history has stopped saving. Nothing already saved was deleted. Clear site data for another site, or export your history.',
                 sw_blocked: 'This browser is blocking local storage, so your reward history and portfolio will not survive a reload. Private browsing usually causes this.',
                 po_invented_1: 'No price feed reached — the',
@@ -3837,6 +3939,11 @@ function renderCalendar(history, chartEl) {
                 nav_reinvest: 'Réinvestissement', nav_compare: 'Comparer', nav_simulation: 'Simulation',
                 nav_performance: 'Performance', nav_alerts: 'Alertes', nav_portfolio: 'Portfolio',
                 nav_efficiency: 'Efficacité',
+                pin_conflict: 'Ton extension rapporte des valeurs différentes de celles que tu as saisies :',
+                pin_use_ext: 'Utiliser les données de l\'extension',
+                pin_keep_mine: 'Garder les miennes',
+                gate_guest: 'L\'utiliser sans compte →',
+                gate_guest_note: 'Le calculateur au complet, sans inscription. Le compte sauvegarde tes scénarios ; l\'extension remplit tes chiffres à ta place.',
                 sw_quota: 'Le stockage de ce navigateur est plein : ton historique de récompenses ne s\'enregistre plus. Rien de déjà enregistré n\'a été supprimé. Libère de l\'espace en effaçant les données d\'un autre site, ou exporte ton historique.',
                 sw_blocked: 'Ce navigateur bloque le stockage local : ton historique et ton portfolio ne survivront pas à un rechargement. C\'est généralement la navigation privée.',
                 po_invented_1: 'Aucune source de prix n\'a répondu — le prix',

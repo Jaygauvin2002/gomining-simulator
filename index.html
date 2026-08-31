@@ -388,6 +388,17 @@
             <div style="flex:1;height:1px;background:rgba(255,255,255,0.07);"></div>
           </div>
 
+          <!-- Sortie du mur. Le simulateur fonctionne depuis toujours à partir
+               de saisies manuelles : rien ne justifiait de le cacher derrière
+               un compte. Le compte sert à sauvegarder et à recevoir l'alerte ;
+               l'extension à remplir les champs tout seuls. Ni l'un ni l'autre
+               n'est nécessaire pour calculer. -->
+          <button id="gate-guest" type="button" style="width:100%;background:transparent;color:#8b949e;border:1px solid rgba(255,255,255,.14);padding:11px 16px;border-radius:9px;font-size:.88em;font-weight:600;cursor:pointer;margin-bottom:8px;transition:color .12s,border-color .12s;"
+                  onmouseover="this.style.color='#e6edf3';this.style.borderColor='rgba(255,255,255,.3)'"
+                  onmouseout="this.style.color='#8b949e';this.style.borderColor='rgba(255,255,255,.14)'"
+                  data-i18n="gate_guest">Use it without an account &rarr;</button>
+          <p style="margin:0 0 20px;font-size:.76em;color:#6e7681;line-height:1.5;" data-i18n="gate_guest_note">Full calculator, no sign-up. An account saves your scenarios; the extension fills your numbers in for you.</p>
+
           <form id="gate-email-form" autocomplete="on">
             <label for="gate-email-input" style="display:block;font-size:.78em;color:#8b949e;margin-bottom:6px;">Email address</label>
             <input id="gate-email-input" type="email" required
@@ -715,6 +726,10 @@
                      détour, parce que tous les chiffres en dépendent. -->
                 <p class="price-origin" id="price-origin" role="status" aria-live="polite" hidden></p>
                 <p class="price-origin" id="storage-warning" role="status" aria-live="polite" hidden></p>
+                <!-- Conflit entre ce que la personne a tapé et ce que l'extension
+                     rapporte. Ni l'un ni l'autre ne gagne en silence : on montre
+                     l'écart et on laisse choisir. -->
+                <p class="price-origin" id="pin-notice" role="status" aria-live="polite" hidden></p>
 
                 <div class="dashboard-hero-grid">
                     <!-- LEFT COLUMN: Simulation Parameters -->
@@ -1820,7 +1835,7 @@
          cache-d'abord et un déploiement ne refait tomber que ce qui a changé.
          Placé exactement où était le bloc inline : mêmes globals, même moment
          d'exécution. Suite de strategy-lab.js et efficiency-calc.js. -->
-    <script src="js/app.js?v=20260831a"></script>
+    <script src="js/app.js?v=20260831b"></script>
 
     <!-- =========================================================
          Auth + analytics modules (Firebase)

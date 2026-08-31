@@ -207,11 +207,34 @@ function renderAuthUI(user) {
   }
 }
 
-// ---- Full-screen gate (locks the app for anonymous visitors) ----
+// ---- Landing gate ----
+//
+// Ce n'était pas une page d'accueil, c'était un MUR : plein écran, z-index
+// 9999, aucune sortie. Un visiteur devait créer un compte, installer une
+// extension, visiter app.gomining.com, puis revenir — cinq étapes avant le
+// moindre chiffre, sur un calculateur gratuit. Le simulateur a toujours
+// fonctionné à partir de saisies manuelles ; le mur cachait un outil déjà
+// utilisable.
+//
+// La page reste — elle porte l'argumentaire et les trois étapes — mais elle
+// se traverse en un clic, et le choix est mémorisé. Le compte et l'extension
+// deviennent des améliorations, pas des péages.
+const GUEST_KEY = "gms_guest";
+
+function isGuest() {
+  try { return localStorage.getItem(GUEST_KEY) === "1"; } catch { return false; }
+}
+function setGuest(on) {
+  try { on ? localStorage.setItem(GUEST_KEY, "1") : localStorage.removeItem(GUEST_KEY); } catch {}
+}
+
 function gateEl() { return document.getElementById("auth-gate"); }
 function appEl()  { return document.getElementById("app-root"); }
 
 function showGate() {
+  // Un invité qui a déjà choisi de continuer ne doit pas revoir la page à
+  // chaque visite : ce serait le mur avec une porte, donc encore un mur.
+  if (isGuest()) { hideGate(); return; }
   const g = gateEl(), a = appEl();
   if (g) g.style.display = "flex";
   if (a) a.style.display = "none";
@@ -228,6 +251,14 @@ function bindGateHandlers() {
   g.__bound = true;
 
   g.querySelector("#gate-google")?.addEventListener("click", signInWithGoogle);
+
+  g.querySelector("#gate-guest")?.addEventListener("click", () => {
+    setGuest(true);
+    hideGate();
+    // Prévenir l'app : elle affiche alors ce qu'un invité peut faire et
+    // comment aller plus loin, au lieu d'un dashboard vide sans explication.
+    try { document.dispatchEvent(new Event("gms-guest-entered")); } catch {}
+  });
 
   const form    = g.querySelector("#gate-email-form");
   const input   = g.querySelector("#gate-email-input");
@@ -293,6 +324,10 @@ onAuthStateChanged(auth, async (user) => {
   bindGateHandlers();
   if (PREVIEW_BYPASS) { hideGate(); return; }
   if (user) {
+    // Une vraie connexion annule le mode invité : sinon, se déconnecter plus
+    // tard laisserait la personne « invitée » à vie et elle ne reverrait
+    // jamais la page de connexion.
+    setGuest(false);
     hideGate();
     try { await recordLogin(user); }
     catch (e) { console.error("recordLogin failed:", e); }
