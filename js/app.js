@@ -3239,17 +3239,18 @@ function renderCalendar(history, chartEl) {
         // jamais celle qui est en examen : promettre une version que la fiche ne
         // propose pas encore envoie l'utilisateur dans un cul-de-sac.
         //
-        // 2026-08-30 : la 4.6 est SERVIE par le store (fiche vérifiée), donc le
-        // seuil passe à 4.6. Tout ce qui est en dessous est soit une installation
+        // 2026-08-31 : la 4.7 est SERVIE par le store (fiche vérifiée), donc le
+        // seuil passe à 4.7. Tout ce qui est en dessous est soit une installation
         // manuelle — le public visé, puisque le téléchargement direct a été
         // retiré — soit une mise à jour automatique en vol, qui se règle en
         // quelques heures.
         //
-        // La 4.6 est le premier build qui somme le Bonus miner dans la puissance
-        // de ferme, date les récompenses sur calculatedAt et applique la liste
-        // blanche d'endpoints. En dessous, les chiffres du site sont faux et pas
-        // seulement vieux — d'où l'intérêt de pousser à la mise à jour.
-        const MIN_EXT_VERSION = '4.6';
+        // Depuis la 4.6 : le Bonus miner est sommé dans la puissance de ferme,
+        // les récompenses sont datées sur calculatedAt, la liste blanche
+        // d'endpoints s'applique. La 4.7 ajoute que la moyenne d'efficacité
+        // n'est plus calculée sur des mineurs muets supposés au meilleur cas.
+        // En dessous, les chiffres du site sont faux et pas seulement vieux.
+        const MIN_EXT_VERSION = '4.7';
         const EXT_STORE_URL = 'https://chromewebstore.google.com/detail/gmsim-%E2%80%94-miner-sync/llchhkfpkjbkiabpofbpfilicpbnihhp';
         function extVersionOutdated(v) {
             if (!v) return true; // no version reported → pre-2.0 build

@@ -56,23 +56,29 @@ check(cmp(MANIFEST.version) >= 0,
 // --- 2. La version exacte du seuil passe -------------------------------
 check(outdated(MIN) === false, `${MIN} n'est pas périmée`);
 
-// --- 3. En dessous : périmée ------------------------------------------
-for (const v of ['1.0', '2.4', '3.9', '4.5', '4.5.9']) {
+// --- 3 & 4. Les cas sont DÉRIVÉS du seuil, pas codés en dur ------------
+// Une première version listait '4.6.1' parmi les versions récentes : vrai
+// face à un seuil de 4.6, faux dès qu'il est passé à 4.7. Le test cassait
+// à chaque relèvement, pour rien. On construit les cas depuis le seuil.
+const [maj, min] = MIN.split('.').map(Number);
+
+for (const v of [`${maj - 1}.${min}`, `${maj}.${min - 1}`, `${maj}.${min - 1}.9`, '1.0']) {
   check(outdated(v) === true, `${v} est périmée face à ${MIN}`);
 }
-
-// --- 4. Au-dessus : pas périmée ----------------------------------------
-for (const v of ['4.7', '5.0', '10.0', '4.6.1']) {
+for (const v of [`${maj}.${min + 1}`, `${maj + 1}.0`, `${maj}.${min}.1`, `${maj + 10}.0`]) {
   check(outdated(v) === false, `${v} n'est pas périmée face à ${MIN}`);
 }
 
 // --- 5. Le piège des chaînes ------------------------------------------
-// '4.10' < '4.6' en comparaison textuelle. Numériquement, 10 > 6.
-// Une extension en 4.10 ne doit PAS se voir dire de se mettre à jour.
-check(outdated('4.10') === false,
-      '4.10 est PLUS RÉCENTE que 4.6 — piège de la comparaison de chaînes');
-check(outdated('4.9') === false, '4.9 est plus récente que 4.6');
-check('4.10' < '4.6', 'la comparaison textuelle se trompe bien ici (le piège est réel)');
+// '4.10' < '4.7' en comparaison textuelle. Numériquement, 10 > 7. Une
+// extension au-delà du dixième mineur ne doit PAS se voir dire de se
+// mettre à jour. Le cas n'a de sens que si le seuil est sous 10.
+if (min < 10) {
+  const trap = `${maj}.10`;
+  check(outdated(trap) === false,
+        `${trap} est PLUS RÉCENTE que ${MIN} — piège de la comparaison de chaînes`);
+  check(trap < MIN, `la comparaison textuelle se trompe bien sur ${trap} vs ${MIN}`);
+}
 
 // --- 6. Absence de version : périmée, jamais une exception -------------
 for (const v of [undefined, null, '', 0, false]) {
